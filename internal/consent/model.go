@@ -9,18 +9,18 @@ import (
 )
 
 type Consent struct {
-	ID            string
-	Status        Status
-	UserCPF       string
-	BusinessCNPJ  string
-	Permissions   []Permission
-	RejectionInfo *RejectionInfo
+	ID            string         `bson:"_id"`
+	Status        Status         `bson:"status"`
+	UserCPF       string         `bson:"user_cpf"`
+	BusinessCNPJ  string         `bson:"business_cnpj,omitempty"`
+	Permissions   []Permission   `bson:"permissions"`
+	RejectionInfo *RejectionInfo `bson:"rejection,omitempty"`
 
-	CreationDateTime     timex.DateTime
-	StatusUpdateDateTime timex.DateTime
-	ExpirationDateTime   *timex.DateTime
+	CreationDateTime     timex.DateTime  `bson:"created_at"`
+	StatusUpdateDateTime timex.DateTime  `bson:"status_updated_at"`
+	ExpirationDateTime   *timex.DateTime `bson:"expires_at,omitempty"`
 
-	ClientID string
+	ClientID string `bson:"client_id"`
 }
 
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorisation] and

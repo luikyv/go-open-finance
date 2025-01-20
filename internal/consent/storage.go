@@ -2,29 +2,46 @@ package consent
 
 import (
 	"context"
-	"errors"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Storage struct {
-	consents map[string]Consent
+	collection *mongo.Collection
 }
 
-func NewStorage() *Storage {
-	return &Storage{
-		consents: make(map[string]Consent),
+func NewStorage(db *mongo.Database) Storage {
+	return Storage{
+		collection: db.Collection("consents"),
 	}
 }
 
-func (st Storage) save(_ context.Context, consent Consent) error {
-	st.consents[consent.ID] = consent
+func (st Storage) save(ctx context.Context, consent Consent) error {
+	shouldUpsert := true
+	filter := bson.D{{Key: "_id", Value: consent.ID}}
+	if _, err := st.collection.ReplaceOne(ctx, filter, consent, &options.ReplaceOptions{
+		Upsert: &shouldUpsert,
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (st Storage) fetch(_ context.Context, id string) (Consent, error) {
-	c, ok := st.consents[id]
-	if !ok {
-		return Consent{}, errors.New("a consent with the informed id was not found")
+func (st Storage) fetch(ctx context.Context, id string) (Consent, error) {
+
+	filter := bson.D{{Key: "_id", Value: id}}
+	result := st.collection.FindOne(ctx, filter)
+	if result.Err() != nil {
+		return Consent{}, result.Err()
 	}
 
-	return c, nil
+	var consent Consent
+	if err := result.Decode(&consent); err != nil {
+		return Consent{}, err
+	}
+
+	return consent, nil
 }

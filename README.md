@@ -41,9 +41,6 @@ This project relies significantly on some Go dependencies that streamline develo
 * Update go-oidc version.
 * Make mongo db remove expired records.
 * Env. Defaults to DEV and log warning?
-* Dynamic fields.
-* Implement user session.
-* Data generators.
 * Business.
 * Add more logs.
 * Better way to generate the software statement assertion.

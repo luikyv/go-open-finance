@@ -19,10 +19,10 @@ var (
 )
 
 type Service struct {
-	storage *Storage
+	storage Storage
 }
 
-func NewService(st *Storage) Service {
+func NewService(st Storage) Service {
 	return Service{
 		storage: st,
 	}

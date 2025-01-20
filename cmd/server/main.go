@@ -13,35 +13,33 @@ import (
 	"github.com/luikyv/go-open-finance/internal/consent"
 	"github.com/luikyv/go-open-finance/internal/oidc"
 	"github.com/luikyv/go-open-finance/internal/user"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 var (
 	host           = getEnv("MOCKBANK_HOST", "https://mockbank.local")
 	mtlsHost       = getEnv("MOCKBANK_MTLS_HOST", "https://matls-mockbank.local")
 	port           = getEnv("MOCKBANK_PORT", "80")
+	dbSchema       = getEnv("MOCKBANK_DB_SCHEMA", "mockbank")
+	dbStringCon    = getEnv("MOCKBANK_DB_CONNECTION", "mongodb://localhost:27017/mockbank")
 	pathPrefixOIDC = "/auth"
 )
 
 func main() {
 	// Logging.
-	logger := slog.New(&logCtxHandler{
-		Handler: slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-			// Make sure time is logged in UTC.
-			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-				if a.Key == slog.TimeKey {
-					utcTime := time.Now()
-					return slog.Attr{Key: slog.TimeKey, Value: slog.TimeValue(utcTime)}
-				}
-				return a
-			},
-		}),
-	})
-	slog.SetDefault(logger)
+	slog.SetDefault(logger())
+
+	// Database.
+	db, err := dbConnection()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Storage.
 	userStorage := user.NewStorage()
-	consentStorage := consent.NewStorage()
+	consentStorage := consent.NewStorage(db)
 
 	// Services.
 	userService := user.NewService(userStorage)
@@ -54,11 +52,11 @@ func main() {
 	// Server.
 	mux := http.NewServeMux()
 
-	op, err := openidProvider(userService, consentService)
+	op, err := openidProvider(db, userService, consentService)
 	if err != nil {
 		log.Fatal(err)
 	}
-	mux.Handle("/auth/", op.Handler())
+	mux.Handle(pathPrefixOIDC+"/", op.Handler())
 
 	opfMux := http.NewServeMux()
 
@@ -86,12 +84,47 @@ func main() {
 	}
 }
 
+func dbConnection() (*mongo.Database, error) {
+	ctx := context.Background()
+
+	conn, err := mongo.Connect(ctx, options.Client().ApplyURI(dbStringCon).SetBSONOptions(&options.BSONOptions{
+		UseJSONStructTags: true,
+		NilMapAsEmpty:     true,
+		NilSliceAsEmpty:   true,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := conn.Ping(ctx, readpref.Primary()); err != nil {
+		return nil, err
+	}
+
+	return conn.Database(dbSchema), nil
+}
+
 // getEnv retrieves an environment variable or returns a fallback value if not found
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
 	}
 	return fallback
+}
+
+func logger() *slog.Logger {
+	return slog.New(&logCtxHandler{
+		Handler: slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+			// Make sure time is logged in UTC.
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if a.Key == slog.TimeKey {
+					utcTime := time.Now()
+					return slog.Attr{Key: slog.TimeKey, Value: slog.TimeValue(utcTime)}
+				}
+				return a
+			},
+		}),
+	})
 }
 
 type logCtxHandler struct {

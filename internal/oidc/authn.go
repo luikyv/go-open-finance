@@ -240,14 +240,8 @@ func (a authenticator) grantConsent(
 	return goidc.StatusSuccess, nil
 }
 
-func (a authenticator) finishFlow(
-	session *goidc.AuthnSession,
-) (
-	goidc.AuthnStatus,
-	error,
-) {
+func (a authenticator) finishFlow(session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 	session.SetUserID(session.StoredParameter(paramUserID).(string))
-	// TODO: Grant scopes based on permissions.
 	session.GrantScopes(session.Scopes)
 	session.SetIDTokenClaimACR(ACROpenBankingLOA2)
 	session.SetIDTokenClaimAuthTime(int(timex.Now().Unix()))

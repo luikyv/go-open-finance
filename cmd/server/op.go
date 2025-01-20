@@ -17,9 +17,17 @@ import (
 	"github.com/luikyv/go-open-finance/internal/consent"
 	"github.com/luikyv/go-open-finance/internal/oidc"
 	"github.com/luikyv/go-open-finance/internal/user"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func openidProvider(userService user.Service, consentService consent.Service) (provider.Provider, error) {
+func openidProvider(
+	db *mongo.Database,
+	userService user.Service,
+	consentService consent.Service,
+) (
+	provider.Provider,
+	error,
+) {
 
 	// Get the file path of the source file.
 	_, filename, _, _ := runtime.Caller(0)
@@ -36,6 +44,9 @@ func openidProvider(userService user.Service, consentService consent.Service) (p
 		func(_ context.Context) (goidc.JSONWebKeySet, error) {
 			return serverJWKS, nil
 		},
+		provider.WithClientStorage(oidc.NewClientManager(db)),
+		provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
+		provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
 		provider.WithPathPrefix(pathPrefixOIDC),
 		provider.WithScopes(oidc.Scopes...),
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
