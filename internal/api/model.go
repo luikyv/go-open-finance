@@ -9,6 +9,21 @@ import (
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
+const (
+	MockBankBrand string = "MockBank"
+	MockBankCNPJ  string = "58540569000120"
+)
+
+type ContextKey string
+
+const (
+	CtxKeyClientID      ContextKey = "client_id"
+	CtxKeySubject       ContextKey = "subject"
+	CtxKeyConsentID     ContextKey = "consent_id"
+	CtxKeyInteractionID ContextKey = "interaction_id"
+	CtxKeyRequestURL    ContextKey = "request_url"
+)
+
 func NewPagination(r *http.Request) page.Pagination {
 	pageNumber := 0
 	pageSize := 0
@@ -40,10 +55,16 @@ type Links struct {
 	Self  string `json:"self"`
 }
 
-// NewLinks generates pagination links (self, first, prev, next, last) based on
+func NewLinks(self string) Links {
+	return Links{
+		Self: self,
+	}
+}
+
+// NewPaginatedLinks generates pagination links (self, first, prev, next, last) based on
 // the current page information and the requested URL.
 // T is a generic type parameter to make the function compatible with any Page type.
-func NewLinks[T any](requestedURL string, page page.Page[T]) Links {
+func NewPaginatedLinks[T any](requestedURL string, page page.Page[T]) Links {
 	// Helper function to construct a URL with query parameters for pagination.
 	buildURL := func(pageNumber int) string {
 		u, _ := url.Parse(requestedURL)
@@ -77,10 +98,28 @@ func NewLinks[T any](requestedURL string, page page.Page[T]) Links {
 
 type Meta struct {
 	RequestDateTime timex.DateTime `json:"requestDateTime"`
+	TotalRecords    int            `json:"totalRecords,omitempty"`
+	TotalPages      int            `json:"totalPages,omitempty"`
 }
 
 func NewMeta() Meta {
 	return Meta{
 		RequestDateTime: timex.DateTimeNow(),
+	}
+}
+
+func NewPaginatedMeta[T any](p page.Page[T]) Meta {
+	return Meta{
+		RequestDateTime: timex.DateTimeNow(),
+		TotalRecords:    p.TotalRecords,
+		TotalPages:      p.TotalPages,
+	}
+}
+
+func NewSingleRecordMeta() Meta {
+	return Meta{
+		RequestDateTime: timex.DateTimeNow(),
+		TotalRecords:    1,
+		TotalPages:      1,
 	}
 }

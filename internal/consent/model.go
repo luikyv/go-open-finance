@@ -8,6 +8,14 @@ import (
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
+const (
+	maxTimeAwaitingAuthorizationSecs = 3600
+	headerCustomerIPAddress          = "X-FAPI-Customer-IP-Address"
+	headerCustomerUserAgent          = "X-Customer-User-Agent"
+	defaultUserDocumentRelation      = "CPF"
+	defaultBusinessDocumentRelation  = "CNPJ"
+)
+
 type Consent struct {
 	ID            string         `bson:"_id"`
 	Status        Status         `bson:"status"`
@@ -15,10 +23,13 @@ type Consent struct {
 	BusinessCNPJ  string         `bson:"business_cnpj,omitempty"`
 	Permissions   []Permission   `bson:"permissions"`
 	RejectionInfo *RejectionInfo `bson:"rejection,omitempty"`
+	Extensions    []Extension    `bson:"extensions,omitempty"`
 
 	CreationDateTime     timex.DateTime  `bson:"created_at"`
 	StatusUpdateDateTime timex.DateTime  `bson:"status_updated_at"`
 	ExpirationDateTime   *timex.DateTime `bson:"expires_at,omitempty"`
+
+	AccountID string `json:"account_id,omitempty"`
 
 	ClientID string `bson:"client_id"`
 }
@@ -282,6 +293,16 @@ const (
 	RejectionReasonConsentTechnicalIssue    RejectionReason = "CONSENT_TECHNICAL_ISSUE"
 	RejectionReasonInternalSecurityReason   RejectionReason = "INTERNAL_SECURITY_REASON"
 )
+
+type Extension struct {
+	ExpirationDateTime         *timex.DateTime `bson:"expires_at,omitempty"`
+	PreviousExpirationDateTime *timex.DateTime `bson:"previous_expires_at,omitempty"`
+	UserCPF                    string          `bson:"user_cpf"`
+	BusinessCNPJ               string          `bson:"business_cnpj,omitempty"`
+	RequestDateTime            timex.DateTime  `bson:"requested_at"`
+	UserIPAddress              string          `bson:"user_ip,omitempty"`
+	UserAgent                  string          `bson:"user_agent,omitempty"`
+}
 
 func consentID() string {
 	return fmt.Sprintf("urn:mockbank:%s", uuid.NewString())

@@ -15,11 +15,7 @@ import (
 	"github.com/luikyv/go-open-finance/internal/user"
 )
 
-func Policy(
-	templatesDir, baseURL string,
-	userService user.Service,
-	consentService consent.Service,
-) goidc.AuthnPolicy {
+func Policy(templatesDir, baseURL string, userService user.Service, consentService consent.Service) goidc.AuthnPolicy {
 
 	loginTemplate := filepath.Join(templatesDir, "/login.html")
 	consentTemplate := filepath.Join(templatesDir, "/consent.html")
@@ -121,7 +117,7 @@ func (a authenticator) setUp(
 		return goidc.StatusFailure, errors.New("missing consent ID")
 	}
 
-	consent, err := a.consentService.Fetch(r.Context(), consentID)
+	consent, err := a.consentService.Consent(r.Context(), consentID)
 	if err != nil {
 		return goidc.StatusFailure, err
 	}
@@ -144,6 +140,9 @@ func (a authenticator) setUp(
 	for i, permission := range consent.Permissions {
 		permissionsStr[i] = string(permission)
 	}
+
+	// TODO: Remove this.
+	consent.AccountID = user.AccountID
 
 	session.StoreParameter(paramConsentID, consent.ID)
 	session.StoreParameter(paramPermissions, strings.Join(permissionsStr, " "))
@@ -195,14 +194,7 @@ func (a authenticator) login(w http.ResponseWriter, r *http.Request, session *go
 	return goidc.StatusSuccess, nil
 }
 
-func (a authenticator) grantConsent(
-	w http.ResponseWriter,
-	r *http.Request,
-	session *goidc.AuthnSession,
-) (
-	goidc.AuthnStatus,
-	error,
-) {
+func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 
 	_ = r.ParseForm()
 
@@ -234,7 +226,23 @@ func (a authenticator) grantConsent(
 		return goidc.StatusFailure, errors.New("consent not granted")
 	}
 
-	if err := a.consentService.Authorize(r.Context(), consentID, permissions...); err != nil {
+	c, err := a.consentService.Consent(r.Context(), consentID)
+	if err != nil {
+		return goidc.StatusFailure, err
+	}
+	u, err := a.userService.UserByCPF(c.UserCPF)
+	if err != nil {
+		return goidc.StatusFailure, err
+	}
+
+	c.Permissions = permissions
+	if slices.ContainsFunc(permissions, func(p consent.Permission) bool {
+		return strings.HasPrefix(string(p), "ACCOUNTS_")
+	}) {
+		c.AccountID = u.AccountID
+	}
+
+	if err := a.consentService.Authorize(r.Context(), c); err != nil {
 		return goidc.StatusFailure, err
 	}
 	return goidc.StatusSuccess, nil

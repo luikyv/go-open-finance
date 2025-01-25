@@ -88,6 +88,17 @@ func DateNow() Date {
 	return NewDate(Now())
 }
 
+func ParseDate(s string) (Date, error) {
+	parsed, err := time.Parse(dateFormat, s)
+	if err != nil {
+		return Date{}, err
+	}
+
+	return Date{
+		Time: parsed.UTC(),
+	}, nil
+}
+
 func Now() time.Time {
 	return time.Now().UTC()
 }

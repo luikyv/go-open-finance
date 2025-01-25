@@ -1,4 +1,4 @@
-package user
+package customer
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ func (router APIHandlerV2) GetPersonalIdentificationsHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeError2(w, err)
+			writeErrorV2(w, err)
 			return
 		}
 	})
@@ -48,7 +48,7 @@ func (router APIHandlerV2) GetPersonalQualificationsHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeError2(w, err)
+			writeErrorV2(w, err)
 			return
 		}
 	})
@@ -65,7 +65,7 @@ func (router APIHandlerV2) GetPersonalFinancialRelationsHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeError2(w, err)
+			writeErrorV2(w, err)
 			return
 		}
 	})
@@ -121,7 +121,7 @@ type personalIdentificationEmailV2 struct {
 func toPersonalIdentificationsResponseV2(ids page.Page[PersonalIdentification], reqURL string) personalIdentificationsResponseV2 {
 	resp := personalIdentificationsResponseV2{
 		Meta:  api.NewMeta(),
-		Links: api.NewLinks(reqURL, ids),
+		Links: api.NewPaginatedLinks(reqURL, ids),
 	}
 	for _, id := range ids.Records {
 		data := personalIdentificationV2{
@@ -235,6 +235,6 @@ func toPersonalFinancialRelationsResponseV2(rels PersonalFinancialRelations, req
 	return resp
 }
 
-func writeError2(w http.ResponseWriter, err error) {
+func writeErrorV2(w http.ResponseWriter, err error) {
 	api.WriteError(w, err)
 }

@@ -27,7 +27,7 @@ func HandleGrantFunc(consentService consent.Service) goidc.HandleGrantFunc {
 			return nil
 		}
 
-		consent, err := consentService.Fetch(r.Context(), consentID)
+		consent, err := consentService.Consent(r.Context(), consentID)
 		if err != nil {
 			return err
 		}

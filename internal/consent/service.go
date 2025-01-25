@@ -7,6 +7,8 @@ import (
 	"slices"
 
 	"github.com/luikyv/go-open-finance/internal/api"
+	"github.com/luikyv/go-open-finance/internal/mock"
+	"github.com/luikyv/go-open-finance/internal/page"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
@@ -16,6 +18,9 @@ var (
 	errInvalidExpiration                      = errors.New("the expiration date time is invalid")
 	errPersonalAndBusinessPermissionsTogether = errors.New("cannot request personal and business permissions together")
 	errAlreadyRejected                        = errors.New("the consent is already rejected")
+	errExtensionNotAllowed                    = errors.New("the consent is not allowed to be extended")
+	errCannotExtendConsentNotAuthorized       = errors.New("the consent is not in the AUTHORISED status")
+	errCannotExtendConsentForJointAccount     = errors.New("a consent created for a joint account cannot be extended")
 )
 
 type Service struct {
@@ -28,28 +33,23 @@ func NewService(st Storage) Service {
 	}
 }
 
-func (s Service) Authorize(ctx context.Context, id string, permissions ...Permission) error {
+func (s Service) Authorize(ctx context.Context, c Consent) error {
 
-	slog.DebugContext(ctx, "trying to authorize consent", slog.String("consent_id", id))
+	slog.DebugContext(ctx, "trying to authorize consent", slog.String("consent_id", c.ID))
 
-	consent, err := s.Fetch(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	if !consent.IsAwaitingAuthorization() {
-		slog.DebugContext(ctx, "cannot authorize a consent that is not awaiting authorization", slog.Any("status", consent.Status))
+	if !c.IsAwaitingAuthorization() {
+		slog.DebugContext(ctx, "cannot authorize a consent that is not awaiting authorization", slog.Any("status", c.Status))
 		return errors.New("invalid consent status")
 	}
 
-	slog.InfoContext(ctx, "authorizing consent", slog.String("consent_id", id))
-	consent.Status = StatusAuthorized
-	consent.Permissions = permissions
-	return s.save(ctx, consent)
+	slog.InfoContext(ctx, "authorizing consent", slog.String("consent_id", c.ID))
+	c.Status = StatusAuthorized
+	c.StatusUpdateDateTime = timex.DateTimeNow()
+	return s.save(ctx, c)
 }
 
-func (s Service) Fetch(ctx context.Context, id string) (Consent, error) {
-	c, err := s.storage.fetch(ctx, id)
+func (s Service) Consent(ctx context.Context, id string) (Consent, error) {
+	c, err := s.storage.consent(ctx, id)
 	if err != nil {
 		return Consent{}, err
 	}
@@ -67,7 +67,7 @@ func (s Service) Fetch(ctx context.Context, id string) (Consent, error) {
 }
 
 func (s Service) Reject(ctx context.Context, id string, info RejectionInfo) error {
-	c, err := s.Fetch(ctx, id)
+	c, err := s.Consent(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -76,26 +76,26 @@ func (s Service) Reject(ctx context.Context, id string, info RejectionInfo) erro
 	}
 
 	c.Status = StatusRejected
+	c.StatusUpdateDateTime = timex.DateTimeNow()
 	c.RejectionInfo = &info
 	return s.save(ctx, c)
 }
 
 func (s Service) delete(ctx context.Context, id string) error {
-	c, err := s.Fetch(ctx, id)
+	c, err := s.Consent(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	c.RejectionInfo = &RejectionInfo{
+	info := RejectionInfo{
 		RejectedBy: RejectedByUser,
 		Reason:     RejectionReasonCustomerManuallyRejected,
 	}
 	if c.IsAuthorized() {
-		c.RejectionInfo.Reason = RejectionReasonCustomerManuallyRevoked
+		info.Reason = RejectionReasonCustomerManuallyRevoked
 	}
-	c.Status = StatusRejected
 
-	return s.save(ctx, c)
+	return s.Reject(ctx, id, info)
 }
 
 func (s Service) create(ctx context.Context, c Consent) error {
@@ -118,6 +118,7 @@ func (s Service) modify(ctx context.Context, consent *Consent) error {
 			RejectedBy: RejectedByUser,
 			Reason:     RejectionReasonConsentExpired,
 		}
+		consent.StatusUpdateDateTime = timex.DateTimeNow()
 		consentWasModified = true
 	}
 
@@ -129,6 +130,7 @@ func (s Service) modify(ctx context.Context, consent *Consent) error {
 			RejectedBy: RejectedByASPSP,
 			Reason:     RejectionReasonConsentMaxDateReached,
 		}
+		consent.StatusUpdateDateTime = timex.DateTimeNow()
 		consentWasModified = true
 	}
 
@@ -144,6 +146,40 @@ func (s Service) modify(ctx context.Context, consent *Consent) error {
 
 func (s Service) save(ctx context.Context, c Consent) error {
 	return s.storage.save(ctx, c)
+}
+
+func (s Service) extend(ctx context.Context, id string, ext Extension) (Consent, error) {
+	c, err := s.Consent(ctx, id)
+	if err != nil {
+		return Consent{}, err
+	}
+
+	if c.UserCPF == mock.CPFWithJointAccount {
+		return Consent{}, errCannotExtendConsentForJointAccount
+	}
+
+	if err := validateExtension(c, ext); err != nil {
+		return Consent{}, err
+	}
+
+	ext.PreviousExpirationDateTime = c.ExpirationDateTime
+	c.ExpirationDateTime = ext.ExpirationDateTime
+	// The most recent extension must come first.
+	c.Extensions = append([]Extension{ext}, c.Extensions...)
+	if err := s.save(ctx, c); err != nil {
+		return Consent{}, err
+	}
+
+	return c, nil
+}
+
+func (s Service) extensions(ctx context.Context, id string, pag page.Pagination) (page.Page[Extension], error) {
+	c, err := s.Consent(ctx, id)
+	if err != nil {
+		return page.Page[Extension]{}, err
+	}
+
+	return page.Paginate(c.Extensions, pag), nil
 }
 
 func validate(c Consent) error {
@@ -197,6 +233,35 @@ func validatePersonalAndBusinessPermissions(requestedPermissions []Permission) e
 
 	if isPersonal && isBusiness {
 		return errPersonalAndBusinessPermissionsTogether
+	}
+
+	return nil
+}
+
+func validateExtension(c Consent, ext Extension) error {
+	if !c.IsAuthorized() {
+		return errCannotExtendConsentNotAuthorized
+	}
+
+	if c.UserCPF != ext.UserCPF {
+		return errExtensionNotAllowed
+	}
+
+	if c.BusinessCNPJ != "" && c.BusinessCNPJ != ext.BusinessCNPJ {
+		return errExtensionNotAllowed
+	}
+
+	if ext.ExpirationDateTime == nil {
+		return nil
+	}
+
+	now := timex.Now()
+	if ext.ExpirationDateTime.Before(now) || ext.ExpirationDateTime.After(now.AddDate(1, 0, 0)) {
+		return errInvalidExpiration
+	}
+
+	if c.ExpirationDateTime != nil && !ext.ExpirationDateTime.After(c.ExpirationDateTime.Time) {
+		return errInvalidExpiration
 	}
 
 	return nil

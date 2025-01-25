@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/luikyv/go-open-finance/internal/api"
+	"github.com/luikyv/go-open-finance/internal/page"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
@@ -59,8 +60,8 @@ func (router APIHandlerV3) CreateHandler() http.Handler {
 
 func (router APIHandlerV3) GetHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("consent_id")
-		c, err := router.service.Fetch(r.Context(), id)
+		id := r.PathValue("id")
+		c, err := router.service.Consent(r.Context(), id)
 		if err != nil {
 			writeErrorV3(w, err)
 			return
@@ -79,7 +80,7 @@ func (router APIHandlerV3) GetHandler() http.Handler {
 
 func (router APIHandlerV3) DeleteHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("consent_id")
+		id := r.PathValue("id")
 		err := router.service.delete(r.Context(), id)
 		if err != nil {
 			writeErrorV3(w, err)
@@ -90,23 +91,91 @@ func (router APIHandlerV3) DeleteHandler() http.Handler {
 	})
 }
 
+func (router APIHandlerV3) ExtendHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if id != r.Context().Value(api.CtxKeyConsentID) {
+			api.WriteError(w, errBadRequest)
+			return
+		}
+
+		ip := r.Header.Get(headerCustomerIPAddress)
+		if ip == "" {
+			api.WriteError(w, errBadRequest)
+			return
+		}
+
+		userAgent := r.Header.Get(headerCustomerUserAgent)
+		if userAgent == "" {
+			api.WriteError(w, errBadRequest)
+			return
+		}
+
+		var req extendRequestV3
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			api.WriteError(w, errBadRequest)
+			return
+		}
+
+		if err := req.validate(); err != nil {
+			writeErrorV3(w, err)
+			return
+		}
+
+		c, err := router.service.extend(r.Context(), id, req.toExtension(ip, userAgent))
+		if err != nil {
+			writeErrorV3(w, err)
+			return
+		}
+
+		resp := toResponseV3(c, router.host)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			api.WriteError(w, errBadRequest)
+			return
+		}
+	})
+}
+
+func (router APIHandlerV3) GetExtensionsHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		pag := api.NewPagination(r)
+		exts, err := router.service.extensions(r.Context(), id, pag)
+		if err != nil {
+			writeErrorV3(w, err)
+			return
+		}
+
+		resp := toExtensionsResponseV3(exts, router.host)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			api.WriteError(w, errBadRequest)
+			return
+		}
+	})
+}
+
 type createRequestV3 struct {
 	Data struct {
-		LoggerUser struct {
-			Document struct {
-				Identification string `json:"identification"`
-				Relation       string `json:"rel"`
-			} `json:"document"`
-		} `json:"loggedUser"`
-		BusinessEntity *struct {
-			Document struct {
-				Identification string `json:"identification"`
-				Relation       string `json:"rel"`
-			} `json:"document"`
-		} `json:"businessEntity,omitempty"`
+		LoggerUser         entityV3  `json:"loggedUser"`
+		BusinessEntity     *entityV3 `json:"businessEntity,omitempty"`
 		Permissions        []Permission
 		ExpirationDateTime *timex.DateTime
 	} `json:"data"`
+}
+
+type entityV3 struct {
+	Document documentV3 `json:"document"`
+}
+
+type documentV3 struct {
+	Identification string `json:"identification"`
+	Relation       string `json:"rel"`
 }
 
 func (req createRequestV3) validate() error {
@@ -159,10 +228,8 @@ type responseV3 struct {
 
 func toResponseV3(c Consent, host string) responseV3 {
 	resp := responseV3{
-		Links: api.Links{
-			Self: host + "/open-banking/consents/v3/consents/" + c.ID,
-		},
-		Meta: api.NewMeta(),
+		Links: api.NewLinks(host + "/open-banking/consents/v3/consents/" + c.ID),
+		Meta:  api.NewMeta(),
 	}
 	resp.Data.ID = c.ID
 	resp.Data.Status = c.Status
@@ -190,9 +257,83 @@ func toResponseV3(c Consent, host string) responseV3 {
 	return resp
 }
 
+type extendRequestV3 struct {
+	Data struct {
+		ExpirationDateTime *timex.DateTime
+		LoggerUser         entityV3  `json:"loggedUser"`
+		BusinessEntity     *entityV3 `json:"businessEntity,omitempty"`
+	} `json:"data"`
+}
+
+func (r extendRequestV3) validate() error {
+	return nil
+}
+
+func (r extendRequestV3) toExtension(ip, userAgent string) Extension {
+	ext := Extension{
+		ExpirationDateTime: r.Data.ExpirationDateTime,
+		UserCPF:            r.Data.LoggerUser.Document.Identification,
+		RequestDateTime:    timex.DateTimeNow(),
+		UserIPAddress:      ip,
+		UserAgent:          userAgent,
+	}
+	if r.Data.BusinessEntity != nil {
+		ext.BusinessCNPJ = r.Data.BusinessEntity.Document.Identification
+	}
+
+	return ext
+}
+
+type extensionsResponseV3 struct {
+	Data  []extensionResponseV3 `json:"data"`
+	Links api.Links             `json:"links"`
+	Meta  api.Meta              `json:"meta"`
+}
+
+type extensionResponseV3 struct {
+	ExpirationDateTime         *timex.DateTime `json:"expirationDateTime,omitempty"`
+	PreviousExpirationDateTime *timex.DateTime `json:"previousExpirationDateTime,omitempty"`
+	LoggerUser                 entityV3        `json:"loggedUser"`
+	RequestDateTime            timex.DateTime  `json:"requestDateTime"`
+	CustomerIPAddress          string          `json:"xFapiCustomerIpAddress"`
+	CustomerUserAgent          string          `json:"xCustomerUserAgent"`
+}
+
+func toExtensionsResponseV3(exts page.Page[Extension], reqURL string) extensionsResponseV3 {
+	resp := extensionsResponseV3{
+		Links: api.Links{
+			Self: reqURL,
+		},
+		Meta: api.NewPaginatedMeta(exts),
+	}
+
+	for _, ext := range exts.Records {
+		resp.Data = append(resp.Data, extensionResponseV3{
+			LoggerUser: entityV3{
+				Document: documentV3{
+					Identification: ext.UserCPF,
+					Relation:       defaultUserDocumentRelation,
+				},
+			},
+			ExpirationDateTime:         ext.ExpirationDateTime,
+			PreviousExpirationDateTime: ext.PreviousExpirationDateTime,
+			RequestDateTime:            ext.RequestDateTime,
+			CustomerIPAddress:          ext.UserIPAddress,
+			CustomerUserAgent:          ext.UserAgent,
+		})
+	}
+
+	return resp
+}
+
 func writeErrorV3(w http.ResponseWriter, err error) {
 	if errors.Is(err, errAccessNotAllowed) {
 		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, errAccessNotAllowed.Error()))
+		return
+	}
+
+	if errors.Is(err, errExtensionNotAllowed) {
+		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, errExtensionNotAllowed.Error()))
 		return
 	}
 
@@ -213,6 +354,16 @@ func writeErrorV3(w http.ResponseWriter, err error) {
 
 	if errors.Is(err, errAlreadyRejected) {
 		api.WriteError(w, api.NewError("CONSENTIMENTO_EM_STATUS_REJEITADO", http.StatusUnprocessableEntity, errAlreadyRejected.Error()))
+		return
+	}
+
+	if errors.Is(err, errCannotExtendConsentNotAuthorized) {
+		api.WriteError(w, api.NewError("ESTADO_CONSENTIMENTO_INVALIDO", http.StatusUnprocessableEntity, errCannotExtendConsentNotAuthorized.Error()))
+		return
+	}
+
+	if errors.Is(err, errCannotExtendConsentForJointAccount) {
+		api.WriteError(w, api.NewError("DEPENDE_MULTIPLA_ALCADA", http.StatusUnprocessableEntity, errCannotExtendConsentForJointAccount.Error()))
 		return
 	}
 

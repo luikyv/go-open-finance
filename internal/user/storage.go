@@ -5,18 +5,12 @@ import (
 )
 
 type Storage struct {
-	users                         []User
-	personalIdentificationsMap    map[string][]PersonalIdentification
-	personalQualificationsMap     map[string]PersonalQualifications
-	personalFinancialRelationsMap map[string]PersonalFinancialRelations
+	users []User
 }
 
 func NewStorage() *Storage {
 	return &Storage{
-		users:                         []User{},
-		personalIdentificationsMap:    make(map[string][]PersonalIdentification),
-		personalQualificationsMap:     make(map[string]PersonalQualifications),
-		personalFinancialRelationsMap: make(map[string]PersonalFinancialRelations),
+		users: []User{},
 	}
 }
 
@@ -43,30 +37,6 @@ func (st *Storage) userByCPF(cpf string) (User, error) {
 	}
 
 	return user, nil
-}
-
-func (s *Storage) addPersonalIdentification(sub string, identification PersonalIdentification) {
-	s.personalIdentificationsMap[sub] = append(s.personalIdentificationsMap[sub], identification)
-}
-
-func (s *Storage) personalIdentifications(sub string) []PersonalIdentification {
-	return s.personalIdentificationsMap[sub]
-}
-
-func (s *Storage) setPersonalQualification(sub string, q PersonalQualifications) {
-	s.personalQualificationsMap[sub] = q
-}
-
-func (s *Storage) personalQualifications(sub string) PersonalQualifications {
-	return s.personalQualificationsMap[sub]
-}
-
-func (s *Storage) setPersonalFinancialRelations(sub string, rels PersonalFinancialRelations) {
-	s.personalFinancialRelationsMap[sub] = rels
-}
-
-func (s *Storage) personalFinancialRelations(sub string) PersonalFinancialRelations {
-	return s.personalFinancialRelationsMap[sub]
 }
 
 func findFirst[T any](elements []T, condition func(t T) bool) (T, bool) {

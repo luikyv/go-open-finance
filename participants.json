@@ -16,6 +16,22 @@
                             },
                             {
                                 "ApiEndpoint": "https://matls-mockbank.local/open-banking/consents/v3/consents/{consentId}"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/consents/v3/consents/{consentId}/extend"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/consents/v3/consents/{consentId}/extensions"
+                            }
+                        ]
+                    },
+                    {
+                        "ApiVersion": "3.0.0",
+                        "ApiFamilyType": "resources",
+                        "Status": "Active",
+                        "ApiDiscoveryEndpoints": [
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/resources/v3/resources"
                             }
                         ]
                     },
@@ -32,6 +48,31 @@
                             },
                             {
                                 "ApiEndpoint": "https://matls-mockbank.local/open-banking/customers/v2/personal/financial-relations"
+                            }
+                        ]
+                    },
+                    {
+                        "ApiVersion": "2.4.1",
+                        "ApiFamilyType": "accounts",
+                        "Status": "Active",
+                        "ApiDiscoveryEndpoints": [
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/accounts/v2/accounts"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/accounts/v2/accounts/{accountId}"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/accounts/v2/accounts/{accountId}/balances"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/accounts/v2/accounts/{accountId}/transactions-current"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits"
                             }
                         ]
                     }

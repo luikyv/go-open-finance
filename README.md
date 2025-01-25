@@ -6,7 +6,9 @@ The following Open Finance Open API Specifications are implemented.
 
 ### Phase 2
 * [API Consents v3.2.0](https://openbanking-brasil.github.io/openapi/swagger-apis/consents/3.2.0.yml)
-* [API Customers v2.2.0](https://raw.githubusercontent.com/OpenBanking-Brasil/openapi/main/swagger-apis/customers/2.2.0.yml)
+* [API Resources v3.0.0](https://openbanking-brasil.github.io/openapi/swagger-apis/resources/3.0.0.yml)
+* [API Customers v2.2.0](https://openbanking-brasil.github.io/openapi/swagger-apis/customers/2.2.0.yml)
+* [API Accounts v2.4.1](https://openbanking-brasil.github.io/openapi/swagger-apis/accounts/2.4.1.yml)
 
 ## Usage and Development Guide
 
@@ -38,9 +40,9 @@ This project relies significantly on some Go dependencies that streamline develo
 [go-oidc](https://github.com/luikyv/go-oidc) is a configurable OpenID provider written in Go. It handles OAuth-related functionalities, including authentication, token issuance, and scopes. Familiarity with this library's concepts is important for understanding the project's implementation of these aspects.
 
 ## TODOs
-* Update go-oidc version.
 * Make mongo db remove expired records.
 * Env. Defaults to DEV and log warning?
 * Business.
 * Add more logs.
 * Better way to generate the software statement assertion.
+* Make the movements in the storage layer?

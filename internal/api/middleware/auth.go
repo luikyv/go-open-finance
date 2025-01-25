@@ -16,7 +16,7 @@ import (
 func AuthPermissions(next http.Handler, consentService consent.Service, permissions ...consent.Permission) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		consent, err := consentService.Fetch(ctx, ctx.Value(api.CtxKeyConsentID).(string))
+		consent, err := consentService.Consent(ctx, ctx.Value(api.CtxKeyConsentID).(string))
 		if err != nil {
 			slog.DebugContext(r.Context(), "the token is not active")
 			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token"))

@@ -30,7 +30,7 @@ func (st Storage) save(ctx context.Context, consent Consent) error {
 	return nil
 }
 
-func (st Storage) fetch(ctx context.Context, id string) (Consent, error) {
+func (st Storage) consent(ctx context.Context, id string) (Consent, error) {
 
 	filter := bson.D{{Key: "_id", Value: id}}
 	result := st.collection.FindOne(ctx, filter)
