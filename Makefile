@@ -15,15 +15,14 @@ setup-dev:
 # A configuration file for the conformance suite is also generated based on the files inside /keys.
 # Note: The Dockerfile to build the conformance suite jar is missing, then it is
 # being added it manually.
+# Note: Some imports in the Conformance Suite project are broken, so they're being replaced for now.
 setup-cs:
 	@if [ ! -d "conformance-suite" ]; then \
 	  echo "Cloning open finance conformance suite repository..."; \
-	  git clone --branch master --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-banking/certification.git conformance-suite; \
+	  git clone --branch master --single-branch --depth=1 https://gitlab.com/raidiam-conformance/open-finance/certification.git conformance-suite; \
+	  sed -i '' 's/\.abstractmodule/\.abstractModule/g' "conformance-suite/src/main/java/net/openid/conformance/openbanking_brasil/testmodules/creditCardApi/testmodule/v2n/CreditCardApiPageSizeTooLargeTestModuleV2n.java"; \
+	  sed -i '' 's/\.abstractmodule/\.abstractModule/g' "conformance-suite/src/main/java/net/openid/conformance/openbanking_brasil/testmodules/creditCardApi/testmodule/abstractModule/AbstractCreditCardApiPageSizeTooLargeTestModule.java"; \
 	fi
-
-	@make build-cs
-
-	@make cs-config
 
 # Runs the main MockBank components.
 run:
@@ -63,18 +62,42 @@ build-cs:
 
 # Create a Conformance Suite configuration file using the client keys in /keys.
 cs-config:
-	@jq --arg clientOneCert "$$(<keys/client_one.crt)" \
+	@jq -n --arg alias "mockbank" \
+	   --arg clientOneCert "$$(<keys/client_one.crt)" \
 	   --arg clientOneKey "$$(<keys/client_one.key)" \
 	   --arg clientTwoCert "$$(<keys/client_two.crt)" \
 	   --arg clientTwoKey "$$(<keys/client_two.key)" \
 	   --argjson clientOneJwks "$$(jq . < keys/client_one.jwks)" \
 	   --argjson clientTwoJwks "$$(jq . < keys/client_two.jwks)" \
-	   '.client.jwks = $$clientOneJwks | \
-	    .mtls.cert = $$clientOneCert | \
-	    .mtls.key = $$clientOneKey | \
-	    .client2.jwks = $$clientTwoJwks | \
-	    .mtls2.cert = $$clientTwoCert | \
-	    .mtls2.key = $$clientTwoKey' \
-		cs_config_base.json > cs_config.json
+	   '{ \
+		  "alias": "mockbank", \
+		  "client": { \
+	        "client_id": "client_one", \
+			"jwks": $$clientOneJwks \
+	      }, \
+		  "mtls": { \
+		    "cert": $$clientOneCert, \
+			"key": $$clientOneKey, \
+		  }, \
+		  "client2": { \
+	        "client_id": "client_two", \
+			"jwks": $$clientTwoJwks \
+	      }, \
+		  "mtls2": { \
+		    "cert": $$clientTwoCert, \
+			"key": $$clientTwoKey, \
+		  }, \
+		  "server": { \
+			"discoveryUrl": "https://mockbank.local/auth/.well-known/openid-configuration" \
+	      }, \
+		  "resource": { \
+	        "brazilOrganizationId": "76b370e3-def5-4798-8b6a-915cb5d6dd74", \
+	      }, \
+		  "directory": { \
+		    "discoveryUrl": "https://directory/.well-known/openid-configuration", \
+		    "apibase": "https://directory", \
+		    "client_id": "random_client" \
+		  } \
+	    }' > cs_config.json
 
-	@echo "Conformance Suite config successfully written to cs_config.json"
+	@echo "New Conformance Suite config successfully written to cs_config.json"

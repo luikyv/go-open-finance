@@ -10,8 +10,24 @@ The following Open Finance Open API Specifications are implemented.
 * [API Customers v2.2.0](https://openbanking-brasil.github.io/openapi/swagger-apis/customers/2.2.0.yml)
 * [API Accounts v2.4.1](https://openbanking-brasil.github.io/openapi/swagger-apis/accounts/2.4.1.yml)
 
-## Usage and Development Guide
+## Mocked Users
+Below is the list of pre-configured users in MockBank. These users are available for testing and interaction within the system.
 
+### Bob
+- Username: bob@mail.com
+- Password: pass
+- CPF: 78628584099
+
+Bob is the main user for MockBank, and most scenarios have been implemented for him.
+
+### Alice
+- Username: alice@mail.com
+- Password: pass
+- CPF: 96362357086
+
+Alice is assigned to a joint account, and her credentials are designed for testing such scenarios.
+
+## Local Setup
 To ensure MockBank works correctly in your local environment, you need to update your system's hosts file (usually located at /etc/hosts on Unix-based systems or C:\Windows\System32\drivers\etc\hosts on Windows). This step allows your machine to resolve the required domains for MockBank.
 ```bash
 127.0.0.1 mockbank.local
@@ -45,4 +61,3 @@ This project relies significantly on some Go dependencies that streamline develo
 * Business.
 * Add more logs.
 * Better way to generate the software statement assertion.
-* Make the movements in the storage layer?

@@ -9,11 +9,6 @@ import (
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
-const (
-	MockBankBrand string = "MockBank"
-	MockBankCNPJ  string = "58540569000120"
-)
-
 type ContextKey string
 
 const (

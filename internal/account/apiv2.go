@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/luikyv/go-open-finance/internal/api"
+	"github.com/luikyv/go-open-finance/internal/mock"
 	"github.com/luikyv/go-open-finance/internal/page"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
@@ -164,8 +165,8 @@ func toAccountsResponseV2(accs page.Page[Account], reqURL string) accountsRespon
 	}
 	for _, acc := range accs.Records {
 		resp.Data = append(resp.Data, accountV2{
-			BrandName:   api.MockBankBrand,
-			CompanyCNPJ: api.MockBankCNPJ,
+			BrandName:   mock.MockBankBrand,
+			CompanyCNPJ: mock.MockBankCNPJ,
 			Type:        acc.Type,
 			CompeCode:   DefaultCompeCode,
 			BranchCode:  DefaultBranch,

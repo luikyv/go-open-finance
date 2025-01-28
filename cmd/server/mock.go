@@ -12,10 +12,6 @@ import (
 	"github.com/luikyv/go-open-finance/internal/user"
 )
 
-const (
-	mockBankCNPJ string = "18753655000104"
-)
-
 func loadMocks(
 	userService user.Service,
 	customerService customer.Service,
@@ -60,7 +56,7 @@ func loadUserBob(
 		BirthDate:     timex.NewDate(time.Date(1999, time.January, 1, 0, 0, 0, 0, time.UTC)),
 		MaritalStatus: customer.MaritalStatusSOLTEIRO,
 		Sex:           customer.SexMale,
-		CompanyCNPJ:   mockBankCNPJ,
+		CompanyCNPJ:   mock.MockBankCNPJ,
 		CPF:           u.CPF,
 		Addresses: []customer.Address{
 			{
@@ -88,7 +84,7 @@ func loadUserBob(
 		UpdateDateTime: timex.NewDateTime(time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)),
 	})
 	customerService.SetPersonalQualification(ctx, u.CPF, customer.PersonalQualifications{
-		CompanyCNPJ:           mockBankCNPJ,
+		CompanyCNPJ:           mock.MockBankCNPJ,
 		Occupation:            customer.OccupationOUTRO,
 		OccupationDescription: "outra ocupação",
 		UpdateDateTime:        timex.NewDateTime(time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)),

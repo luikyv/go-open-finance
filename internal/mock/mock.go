@@ -8,6 +8,8 @@ import (
 
 const (
 	CPFWithJointAccount string = "96362357086"
+	MockBankBrand       string = "MockBank"
+	MockBankCNPJ        string = "58540569000120"
 )
 
 func IsJointAccountPendingAuth(consentCreateAt timex.DateTime) bool {
