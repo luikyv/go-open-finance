@@ -142,7 +142,12 @@ func (router APIHandlerV3) ExtendHandler() http.Handler {
 func (router APIHandlerV3) GetExtensionsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-		pag := api.NewPagination(r)
+		pag, err := api.NewPagination(r)
+		if err != nil {
+			writeErrorV3(w, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, err.Error()))
+			return
+		}
+
 		exts, err := router.service.extensions(r.Context(), id, pag)
 		if err != nil {
 			writeErrorV3(w, err)

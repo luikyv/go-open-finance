@@ -20,7 +20,6 @@ FROM alpine:latest
 WORKDIR /app
 
 COPY --from=builder /app/main ./cmd/server/
-COPY ./keys/ ./keys/
 COPY ./templates/ ./templates/
 
 EXPOSE 80

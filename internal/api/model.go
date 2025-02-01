@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -19,7 +20,7 @@ const (
 	CtxKeyRequestURL    ContextKey = "request_url"
 )
 
-func NewPagination(r *http.Request) page.Pagination {
+func NewPagination(r *http.Request) (page.Pagination, error) {
 	pageNumber := 0
 	pageSize := 0
 
@@ -39,7 +40,11 @@ func NewPagination(r *http.Request) page.Pagination {
 		}
 	}
 
-	return page.NewPagination(pageNumber, pageSize)
+	if pageSize > 1000 {
+		return page.Pagination{}, errors.New("invalid page size")
+	}
+
+	return page.NewPagination(pageNumber, pageSize), nil
 }
 
 type Links struct {

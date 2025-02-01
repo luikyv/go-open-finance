@@ -11,6 +11,10 @@ import (
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
+const (
+	dateTimeMillisFormat = "2006-01-02T15:04:05.000Z"
+)
+
 type APIHandlerV2 struct {
 	service Service
 }
@@ -25,11 +29,15 @@ func (router APIHandlerV2) GetAccountsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
-		pag := api.NewPagination(r)
+		pag, err := api.NewPagination(r)
+		if err != nil {
+			writeErrorV2(w, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, err.Error()), true)
+			return
+		}
 
 		accs, err := router.service.accounts(r.Context(), consentID, pag)
 		if err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 
@@ -38,7 +46,7 @@ func (router APIHandlerV2) GetAccountsHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 	})
@@ -52,7 +60,7 @@ func (router APIHandlerV2) GetAccountHandler() http.Handler {
 
 		acc, err := router.service.account(r.Context(), accID, consentID)
 		if err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 
@@ -61,7 +69,7 @@ func (router APIHandlerV2) GetAccountHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 	})
@@ -75,7 +83,7 @@ func (router APIHandlerV2) GetAccountBalancesHandler() http.Handler {
 
 		acc, err := router.service.account(r.Context(), accID, consentID)
 		if err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 
@@ -84,23 +92,40 @@ func (router APIHandlerV2) GetAccountBalancesHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 	})
 }
 
 func (router APIHandlerV2) GetAccountTransactionsHandler() http.Handler {
+	return router.getAccountTransactionsHandler(false, false)
+}
+
+func (router APIHandlerV2) GetAccountTransactionsCurrentHandler() http.Handler {
+	return router.getAccountTransactionsHandler(true, true)
+}
+
+func (router APIHandlerV2) getAccountTransactionsHandler(current bool, pagination bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
 		accID := r.PathValue("id")
-		pag := api.NewPagination(r)
-		filter := newTransactionFilter(r)
+		pag, err := api.NewPagination(r)
+		if err != nil {
+			writeErrorV2(w, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, err.Error()), pagination)
+			return
+		}
+
+		filter, err := newTransactionFilter(r, current)
+		if err != nil {
+			writeErrorV2(w, err, pagination)
+			return
+		}
 
 		trs, err := router.service.transactions(r.Context(), accID, consentID, pag, filter)
 		if err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, pagination)
 			return
 		}
 
@@ -109,7 +134,7 @@ func (router APIHandlerV2) GetAccountTransactionsHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, pagination)
 			return
 		}
 	})
@@ -123,7 +148,7 @@ func (router APIHandlerV2) GetAccountOverdraftLimitsHandler() http.Handler {
 
 		acc, err := router.service.account(r.Context(), accID, consentID)
 		if err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 
@@ -132,7 +157,7 @@ func (router APIHandlerV2) GetAccountOverdraftLimitsHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err)
+			writeErrorV2(w, err, true)
 			return
 		}
 	})
@@ -270,14 +295,14 @@ type transactionResponseV2 struct {
 	Name         string            `json:"transactionName"`
 	Type         TransactionType   `json:"type"`
 	Amount       amountResponseV2  `json:"transactionAmount"`
-	DateTime     timex.DateTime    `json:"transactionDateTime"`
+	DateTime     string            `json:"transactionDateTime"`
 }
 
 func toAccountTransactionsResponseV2(trs page.Page[Transaction], reqURL string) transactionsResponseV2 {
 	resp := transactionsResponseV2{
 		Data:  []transactionResponseV2{},
-		Meta:  api.NewPaginatedMeta(trs),
-		Links: api.NewLinks(reqURL),
+		Meta:  api.NewMeta(),
+		Links: api.NewPaginatedLinks(reqURL, trs),
 	}
 
 	for _, tr := range trs.Records {
@@ -291,7 +316,7 @@ func toAccountTransactionsResponseV2(trs page.Page[Transaction], reqURL string) 
 				Amount:   tr.Amount,
 				Currency: DefaultCurrency,
 			},
-			DateTime: tr.DateTime,
+			DateTime: tr.DateTime.Format(dateTimeMillisFormat),
 		})
 	}
 
@@ -343,7 +368,7 @@ type amountResponseV2 struct {
 	Currency string `json:"currency"`
 }
 
-func newTransactionFilter(r *http.Request) transactionFilter {
+func newTransactionFilter(r *http.Request, current bool) (transactionFilter, error) {
 	now := timex.DateNow()
 	filter := transactionFilter{
 		from: now,
@@ -351,33 +376,68 @@ func newTransactionFilter(r *http.Request) transactionFilter {
 	}
 
 	from := r.URL.Query().Get("fromBookingDate")
-	if from != "" {
-		fromDate, err := timex.ParseDate(from)
-		// TODO: 23:59.
-		if err == nil {
-			filter.from = fromDate
-		}
-	}
-
 	to := r.URL.Query().Get("toBookingDate")
+
+	if from != "" {
+		if to == "" {
+			return transactionFilter{}, api.NewError("INVALID_PARAMETER",
+				http.StatusUnprocessableEntity, "toBookingDate is required if fromBookingDate is informed")
+		}
+
+		fromDate, err := timex.ParseDate(from)
+		if err != nil {
+			return transactionFilter{}, api.NewError("INVALID_PARAMETER",
+				http.StatusUnprocessableEntity, "invalid fromBookingDate")
+		}
+		filter.from = fromDate
+	}
+
 	if to != "" {
+		if from == "" {
+			return transactionFilter{}, api.NewError("INVALID_PARAMETER",
+				http.StatusUnprocessableEntity, "fromBookingDate is required if toBookingDate is informed")
+		}
+
 		toDate, err := timex.ParseDate(to)
-		if err == nil {
-			filter.to = toDate
+		if err != nil {
+			return transactionFilter{}, api.NewError("INVALID_PARAMETER",
+				http.StatusUnprocessableEntity, "invalid toBookingDate")
+		}
+		filter.to = toDate
+	}
+
+	if current {
+		nowMinus7Days := now.AddDate(0, 0, -7)
+		if filter.from.Before(nowMinus7Days) {
+			return transactionFilter{}, api.NewError("INVALID_PARAMETER",
+				http.StatusUnprocessableEntity, "fromBookingDate too far in the past")
+		}
+
+		if filter.to.Before(nowMinus7Days) {
+			return transactionFilter{}, api.NewError("INVALID_PARAMETER",
+				http.StatusUnprocessableEntity, "toBookingDate too far in the past")
 		}
 	}
 
-	return filter
+	return filter, nil
 }
 
-func writeErrorV2(w http.ResponseWriter, err error) {
+func writeErrorV2(w http.ResponseWriter, err error, pagination bool) {
 	if errors.Is(err, errAccountNotAllowed) {
-		api.WriteError(w, api.NewError("FORBIDDEN", http.StatusForbidden, errAccountNotAllowed.Error()))
+		err := api.NewError("FORBIDDEN", http.StatusForbidden, errAccountNotAllowed.Error())
+		if pagination {
+			err = err.WithPagination()
+		}
+		api.WriteError(w, err)
 		return
 	}
 
 	if errors.Is(err, errJointAccountPendingAuthorization) {
-		api.WriteError(w, api.NewError("STATUS_RESOURCE_AWAITING_AUTHORIZATION", http.StatusForbidden, errAccountNotAllowed.Error()))
+		err := api.NewError("STATUS_RESOURCE_AWAITING_AUTHORIZATION", http.StatusForbidden, errAccountNotAllowed.Error())
+		if pagination {
+			err = err.WithPagination()
+		}
+		api.WriteError(w, err)
 		return
 	}
 

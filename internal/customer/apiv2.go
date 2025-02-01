@@ -23,7 +23,11 @@ func (router APIHandlerV2) GetPersonalIdentificationsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sub := r.Context().Value(api.CtxKeySubject).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
-		pag := api.NewPagination(r)
+		pag, err := api.NewPagination(r)
+		if err != nil {
+			writeErrorV2(w, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, err.Error()))
+			return
+		}
 
 		identifications := router.service.personalIdentifications(r.Context(), sub, pag)
 		resp := toPersonalIdentificationsResponseV2(identifications, reqURL)

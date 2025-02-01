@@ -15,7 +15,11 @@ import (
 	"github.com/luikyv/go-open-finance/internal/user"
 )
 
-func Policy(templatesDir, baseURL string, userService user.Service, consentService consent.Service) goidc.AuthnPolicy {
+func Policy(
+	templatesDir, baseURL string,
+	userService user.Service,
+	consentService consent.Service,
+) goidc.AuthnPolicy {
 
 	loginTemplate := filepath.Join(templatesDir, "/login.html")
 	consentTemplate := filepath.Join(templatesDir, "/consent.html")
@@ -105,13 +109,7 @@ func (a authenticator) authenticate(w http.ResponseWriter, r *http.Request, sess
 	return goidc.StatusFailure, errors.New("access denied")
 }
 
-func (a authenticator) setUp(
-	r *http.Request,
-	session *goidc.AuthnSession,
-) (
-	goidc.AuthnStatus,
-	error,
-) {
+func (a authenticator) setUp(r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
 	consentID, ok := consentID(session.Scopes)
 	if !ok {
 		return goidc.StatusFailure, errors.New("missing consent ID")
@@ -235,8 +233,7 @@ func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, sess
 		return goidc.StatusFailure, err
 	}
 
-	c.Permissions = permissions
-	if slices.ContainsFunc(permissions, func(p consent.Permission) bool {
+	if slices.ContainsFunc(c.Permissions, func(p consent.Permission) bool {
 		return strings.HasPrefix(string(p), "ACCOUNTS_")
 	}) {
 		c.AccountID = u.AccountID

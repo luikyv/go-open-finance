@@ -26,7 +26,8 @@ func (s *Storage) transactions(accID string, pag page.Pagination, filter transac
 	acc := s.account(accID)
 	var trs []Transaction
 	for _, tr := range acc.Transactions {
-		if tr.DateTime.Before(filter.from.Time) || tr.DateTime.After(filter.to.Time) {
+		date := tr.DateTime.ToDate()
+		if date.Before(filter.from.Time) || date.After(filter.to.Time) {
 			continue
 		}
 

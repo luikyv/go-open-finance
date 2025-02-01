@@ -22,7 +22,11 @@ func (router APIHandlerV3) GetHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
-		pag := api.NewPagination(r)
+		pag, err := api.NewPagination(r)
+		if err != nil {
+			writeErrorV3(w, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, err.Error()))
+			return
+		}
 
 		rs, err := router.service.resources(r.Context(), consentID, pag)
 		if err != nil {

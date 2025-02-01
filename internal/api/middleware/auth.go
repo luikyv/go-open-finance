@@ -14,24 +14,44 @@ import (
 )
 
 func AuthPermissions(next http.Handler, consentService consent.Service, permissions ...consent.Permission) http.Handler {
+	return authPermissions(next, consentService, false, permissions...)
+}
+
+func AuthPermissionsWithPagination(next http.Handler, consentService consent.Service, permissions ...consent.Permission) http.Handler {
+	return authPermissions(next, consentService, true, permissions...)
+}
+
+func authPermissions(next http.Handler, consentService consent.Service, pagination bool, permissions ...consent.Permission) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		consent, err := consentService.Consent(ctx, ctx.Value(api.CtxKeyConsentID).(string))
 		if err != nil {
 			slog.DebugContext(r.Context(), "the token is not active")
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token"))
+			err := api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token")
+			if pagination {
+				err = err.WithPagination()
+			}
+			api.WriteError(w, err)
 			return
 		}
 
 		if !consent.IsAuthorized() {
 			slog.DebugContext(r.Context(), "the consent is not authorized")
-			api.WriteError(w, api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized"))
+			err := api.NewError("INVALID_STATUS", http.StatusUnauthorized, "the consent is not authorized")
+			if pagination {
+				err = err.WithPagination()
+			}
+			api.WriteError(w, err)
 			return
 		}
 
 		if !consent.HasPermissions(permissions) {
 			slog.DebugContext(r.Context(), "the consent doesn't have the required permissions")
-			api.WriteError(w, api.NewError("INVALID_STATUS", http.StatusForbidden, "the consent is missing permissions"))
+			err := api.NewError("INVALID_STATUS", http.StatusForbidden, "the consent is missing permissions")
+			if pagination {
+				err = err.WithPagination()
+			}
+			api.WriteError(w, err)
 			return
 		}
 
@@ -40,18 +60,34 @@ func AuthPermissions(next http.Handler, consentService consent.Service, permissi
 }
 
 func AuthScopes(next http.Handler, op provider.Provider, scopes ...goidc.Scope) http.Handler {
+	return authScopes(next, op, false, scopes...)
+}
+
+func AuthScopesWithPagination(next http.Handler, op provider.Provider, scopes ...goidc.Scope) http.Handler {
+	return authScopes(next, op, true, scopes...)
+}
+
+func authScopes(next http.Handler, op provider.Provider, pagination bool, scopes ...goidc.Scope) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenInfo, err := op.TokenInfoFromRequest(w, r)
 		if err != nil {
 			slog.DebugContext(r.Context(), "the token is not active")
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token"))
+			err := api.NewError("UNAUTHORISED", http.StatusUnauthorized, "invalid token")
+			if pagination {
+				err = err.WithPagination()
+			}
+			api.WriteError(w, err)
 			return
 		}
 
 		tokenScopes := strings.Split(tokenInfo.Scopes, " ")
 		if !areScopesValid(scopes, tokenScopes) {
 			slog.DebugContext(r.Context(), "invalid scopes", slog.String("token_scopes", tokenInfo.Scopes))
-			api.WriteError(w, api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes"))
+			err := api.NewError("UNAUTHORISED", http.StatusUnauthorized, "token missing scopes")
+			if pagination {
+				err = err.WithPagination()
+			}
+			api.WriteError(w, err)
 			return
 		}
 

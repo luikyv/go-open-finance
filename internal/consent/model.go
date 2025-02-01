@@ -25,13 +25,13 @@ type Consent struct {
 	RejectionInfo *RejectionInfo `bson:"rejection,omitempty"`
 	Extensions    []Extension    `bson:"extensions,omitempty"`
 
+	ClientID             string          `bson:"client_id"`
 	CreationDateTime     timex.DateTime  `bson:"created_at"`
 	StatusUpdateDateTime timex.DateTime  `bson:"status_updated_at"`
 	ExpirationDateTime   *timex.DateTime `bson:"expires_at,omitempty"`
 
+	// Resources consented by the user.
 	AccountID string `json:"account_id,omitempty"`
-
-	ClientID string `bson:"client_id"`
 }
 
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorisation] and

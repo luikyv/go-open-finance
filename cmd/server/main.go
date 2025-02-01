@@ -71,7 +71,6 @@ func main() {
 
 	opfMux := http.NewServeMux()
 
-	// TODO: Find an easier way to set this.
 	consentMux := http.NewServeMux()
 	consentMux.Handle("POST /open-banking/consents/v3/consents", middleware.AuthScopes(consentAPIHandlerV3.CreateHandler(), op, oidc.ScopeConsents))
 	consentMux.Handle("GET /open-banking/consents/v3/consents/{id}", middleware.AuthScopes(consentAPIHandlerV3.GetHandler(), op, oidc.ScopeConsents))
@@ -94,18 +93,18 @@ func main() {
 
 	accountMux := http.NewServeMux()
 	accountMux.Handle("GET /open-banking/accounts/v2/accounts",
-		middleware.AuthPermissions(accountAPIHandlerV2.GetAccountsHandler(), consentService, consent.PermissionAccountsRead))
+		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountsHandler(), consentService, consent.PermissionAccountsRead))
 	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}",
-		middleware.AuthPermissions(accountAPIHandlerV2.GetAccountHandler(), consentService, consent.PermissionAccountsRead))
+		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountHandler(), consentService, consent.PermissionAccountsRead))
 	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/balances",
-		middleware.AuthPermissions(accountAPIHandlerV2.GetAccountBalancesHandler(), consentService, consent.PermissionAccountsBalanceRead))
+		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountBalancesHandler(), consentService, consent.PermissionAccountsBalanceRead))
 	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/transactions",
 		middleware.AuthPermissions(accountAPIHandlerV2.GetAccountTransactionsHandler(), consentService, consent.PermissionAccountsTransactionsRead))
 	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/transactions-current",
-		middleware.AuthPermissions(accountAPIHandlerV2.GetAccountTransactionsHandler(), consentService, consent.PermissionAccountsTransactionsRead))
+		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountTransactionsCurrentHandler(), consentService, consent.PermissionAccountsTransactionsRead))
 	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/overdraft-limits",
-		middleware.AuthPermissions(accountAPIHandlerV2.GetAccountOverdraftLimitsHandler(), consentService, consent.PermissionAccountsOverdraftLimitsRead))
-	opfMux.Handle("/open-banking/accounts/", middleware.AuthScopes(accountMux, op, goidc.ScopeOpenID, oidc.ScopeConsentID))
+		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountOverdraftLimitsHandler(), consentService, consent.PermissionAccountsOverdraftLimitsRead))
+	opfMux.Handle("/open-banking/accounts/", middleware.AuthScopesWithPagination(accountMux, op, goidc.ScopeOpenID, oidc.ScopeConsentID))
 
 	mux.Handle("/open-banking/", middleware.Meta(middleware.FAPIID(opfMux), mtlsHost))
 

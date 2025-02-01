@@ -6,7 +6,9 @@ services:
       - main
     build: .
     environment:
-      - MOCKBANK_DB_CONNECTION=mongodb://mongodb:27017/mockin
+      - MOCKBANK_DB_CONNECTION=mongodb://mongodb:27017/mockbank
+    volumes:
+      - ./keys/:/app/keys/
 
   mongodb:
     profiles:

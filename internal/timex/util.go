@@ -40,6 +40,10 @@ func (d DateTime) String() string {
 	return d.Time.Format(dateTimeFormat)
 }
 
+func (d DateTime) ToDate() Date {
+	return NewDate(d.Time.Truncate(24 * time.Hour))
+}
+
 func NewDateTime(t time.Time) DateTime {
 	return DateTime{
 		Time: t,
@@ -80,7 +84,7 @@ func (d Date) String() string {
 
 func NewDate(t time.Time) Date {
 	return Date{
-		Time: t,
+		Time: t.Truncate(24 * time.Hour),
 	}
 }
 
