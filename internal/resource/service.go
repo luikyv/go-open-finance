@@ -31,7 +31,7 @@ func (s Service) resources(ctx context.Context, consentID string, pag page.Pagin
 			Type:   TypeAccount,
 			Status: StatusAvailable,
 		}
-		if c.UserCPF == mock.CPFWithJointAccount && mock.IsJointAccountPendingAuth(c.CreationDateTime) {
+		if c.UserCPF == mock.CPFWithJointAccount && mock.IsJointAccountPendingAuth(c.StatusUpdateDateTime) {
 			r.Status = StatusPendingAuthorization
 		}
 		rs = append(rs, r)

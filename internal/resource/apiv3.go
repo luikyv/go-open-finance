@@ -4,21 +4,39 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/go-open-finance/internal/api"
+	"github.com/luikyv/go-open-finance/internal/api/middleware"
+	"github.com/luikyv/go-open-finance/internal/consent"
 	"github.com/luikyv/go-open-finance/internal/page"
 )
 
-type APIHandlerV3 struct {
-	service Service
+type APIRouterV3 struct {
+	host           string
+	service        Service
+	consentService consent.Service
+	op             provider.Provider
 }
 
-func NewAPIHandlerV3(service Service) APIHandlerV3 {
-	return APIHandlerV3{
-		service: service,
+func NewAPIRouterV3(host string, service Service, consentService consent.Service, op provider.Provider) APIRouterV3 {
+	return APIRouterV3{
+		host:           host,
+		service:        service,
+		consentService: consentService,
+		op:             op,
 	}
 }
 
-func (router APIHandlerV3) GetHandler() http.Handler {
+func (router APIRouterV3) Register(mux *http.ServeMux) {
+	handler := router.getHandler()
+	handler = consent.PermissionMiddleware(handler, router.consentService, consent.PermissionResourcesRead)
+	handler = middleware.AuthScopes(handler, router.op, consent.ScopeID)
+	handler = middleware.FAPIID(handler)
+	handler = middleware.Meta(handler, router.host)
+	mux.Handle("GET /open-banking/resources/v3/resources", handler)
+}
+
+func (router APIRouterV3) getHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
@@ -59,7 +77,7 @@ type resourceV3 struct {
 
 func toResponseV3(rs page.Page[Resource], reqURL string) responseV3 {
 	resp := responseV3{
-		Meta:  api.NewMeta(),
+		Meta:  api.NewPaginatedMeta(rs),
 		Links: api.NewPaginatedLinks(reqURL, rs),
 	}
 	for _, r := range rs.Records {

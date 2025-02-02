@@ -14,11 +14,50 @@ import (
 
 	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-oidc/pkg/provider"
+	"github.com/luikyv/go-open-finance/internal/account"
 	"github.com/luikyv/go-open-finance/internal/consent"
+	"github.com/luikyv/go-open-finance/internal/customer"
 	"github.com/luikyv/go-open-finance/internal/oidc"
+	"github.com/luikyv/go-open-finance/internal/resource"
 	"github.com/luikyv/go-open-finance/internal/user"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+var Scopes = []goidc.Scope{
+	goidc.ScopeOpenID,
+	consent.ScopeID,
+	consent.Scope,
+	customer.Scope,
+	account.Scope,
+	// ScopeCreditCardAccounts,
+	// ScopeLoans,
+	// ScopeFinancings,
+	// ScopeUnarrangedAccountsOverdraft,
+	// ScopeInvoiceFinancings,
+	// ScopeBankFixedIncomes,
+	// ScopeCreditFixedIncomes,
+	// ScopeVariableIncomes,
+	// ScopeTreasureTitles,
+	// ScopeFunds,
+	// ScopeExchanges,
+	resource.Scope,
+}
+
+// var (
+// 	ScopeOpenID                      = goidc.ScopeOpenID
+// 	ScopeAccounts                    = goidc.NewScope("accounts")
+// 	ScopeCreditCardAccounts          = goidc.NewScope("credit-cards-accounts")
+// 	ScopeLoans                       = goidc.NewScope("loans")
+// 	ScopeFinancings                  = goidc.NewScope("financings")
+// 	ScopeUnarrangedAccountsOverdraft = goidc.NewScope("unarranged-accounts-overdraft")
+// 	ScopeInvoiceFinancings           = goidc.NewScope("invoice-financings")
+// 	ScopeBankFixedIncomes            = goidc.NewScope("bank-fixed-incomes")
+// 	ScopeCreditFixedIncomes          = goidc.NewScope("credit-fixed-incomes")
+// 	ScopeVariableIncomes             = goidc.NewScope("variable-incomes")
+// 	ScopeTreasureTitles              = goidc.NewScope("treasure-titles")
+// 	ScopeFunds                       = goidc.NewScope("funds")
+// 	ScopeExchanges                   = goidc.NewScope("exchanges")
+// )
 
 func openidProvider(
 	db *mongo.Database,
@@ -48,7 +87,7 @@ func openidProvider(
 		provider.WithAuthnSessionStorage(oidc.NewAuthnSessionManager(db)),
 		provider.WithGrantSessionStorage(oidc.NewGrantSessionManager(db)),
 		provider.WithPathPrefix(pathPrefixOIDC),
-		provider.WithScopes(oidc.Scopes...),
+		provider.WithScopes(Scopes...),
 		provider.WithTokenOptions(oidc.TokenOptionsFunc()),
 		provider.WithAuthorizationCodeGrant(),
 		provider.WithImplicitGrant(),
@@ -75,7 +114,7 @@ func openidProvider(
 		provider.WithHandleGrantFunc(oidc.HandleGrantFunc(consentService)),
 		provider.WithPolicy(oidc.Policy(templatesDirPath, host+pathPrefixOIDC, userService, consentService)),
 		provider.WithNotifyErrorFunc(oidc.LogErrorFunc()),
-		provider.WithDCR(oidc.DCRFunc(oidc.Scopes), func(r *http.Request, s string) error {
+		provider.WithDCR(oidc.DCRFunc(Scopes), func(r *http.Request, s string) error {
 			return nil
 		}),
 		provider.WithHTTPClientFunc(httpClientFunc()),
@@ -84,7 +123,7 @@ func openidProvider(
 
 func client(clientID string, keysDir string) *goidc.Client {
 	var scopes []string
-	for _, scope := range oidc.Scopes {
+	for _, scope := range Scopes {
 		scopes = append(scopes, scope.ID)
 	}
 

@@ -7,7 +7,10 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/go-open-finance/internal/api"
+	"github.com/luikyv/go-open-finance/internal/api/middleware"
 	"github.com/luikyv/go-open-finance/internal/page"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
@@ -16,19 +19,50 @@ var (
 	errBadRequest = api.NewError("INVALID_REQUEST", http.StatusBadRequest, "invalid request")
 )
 
-type APIHandlerV3 struct {
+type APIRouterV3 struct {
 	host    string
 	service Service
+	op      provider.Provider
 }
 
-func NewAPIHandlerV3(host string, service Service) APIHandlerV3 {
-	return APIHandlerV3{
+func NewAPIRouterV3(host string, service Service, op provider.Provider) APIRouterV3 {
+	return APIRouterV3{
 		host:    host,
 		service: service,
+		op:      op,
 	}
 }
 
-func (router APIHandlerV3) CreateHandler() http.Handler {
+func (router APIRouterV3) Register(mux *http.ServeMux) {
+	consentMux := http.NewServeMux()
+
+	handler := router.CreateHandler()
+	handler = middleware.AuthScopes(handler, router.op, Scope)
+	consentMux.Handle("POST /open-banking/consents/v3/consents", handler)
+
+	handler = router.GetHandler()
+	handler = middleware.AuthScopes(handler, router.op, Scope)
+	consentMux.Handle("GET /open-banking/consents/v3/consents/{id}", handler)
+
+	handler = router.DeleteHandler()
+	handler = middleware.AuthScopes(handler, router.op, Scope)
+	consentMux.Handle("DELETE /open-banking/consents/v3/consents/{id}", handler)
+
+	handler = router.ExtendHandler()
+	handler = middleware.AuthScopes(handler, router.op, goidc.ScopeOpenID, ScopeID)
+	consentMux.Handle("POST /open-banking/consents/v3/consents/{id}/extends", handler)
+
+	handler = router.GetExtensionsHandler()
+	handler = middleware.AuthScopes(handler, router.op, Scope)
+	consentMux.Handle("GET /open-banking/consents/v3/consents/{id}/extensions", handler)
+
+	handler = consentMux
+	handler = middleware.FAPIID(handler)
+	handler = middleware.Meta(handler, router.host)
+	mux.Handle("/open-banking/consents/", handler)
+}
+
+func (router APIRouterV3) CreateHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req createRequestV3
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -48,17 +82,11 @@ func (router APIHandlerV3) CreateHandler() http.Handler {
 		}
 
 		resp := toResponseV3(consent, router.host)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			api.WriteError(w, errBadRequest)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusCreated)
 	})
 }
 
-func (router APIHandlerV3) GetHandler() http.Handler {
+func (router APIRouterV3) GetHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		c, err := router.service.Consent(r.Context(), id)
@@ -68,17 +96,11 @@ func (router APIHandlerV3) GetHandler() http.Handler {
 		}
 
 		resp := toResponseV3(c, router.host)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			api.WriteError(w, errBadRequest)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
 
-func (router APIHandlerV3) DeleteHandler() http.Handler {
+func (router APIRouterV3) DeleteHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		err := router.service.delete(r.Context(), id)
@@ -91,7 +113,7 @@ func (router APIHandlerV3) DeleteHandler() http.Handler {
 	})
 }
 
-func (router APIHandlerV3) ExtendHandler() http.Handler {
+func (router APIRouterV3) ExtendHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if id != r.Context().Value(api.CtxKeyConsentID) {
@@ -129,17 +151,11 @@ func (router APIHandlerV3) ExtendHandler() http.Handler {
 		}
 
 		resp := toResponseV3(c, router.host)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			api.WriteError(w, errBadRequest)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusCreated)
 	})
 }
 
-func (router APIHandlerV3) GetExtensionsHandler() http.Handler {
+func (router APIRouterV3) GetExtensionsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		pag, err := api.NewPagination(r)

@@ -22,7 +22,7 @@ const (
 
 func HandleGrantFunc(consentService consent.Service) goidc.HandleGrantFunc {
 	return func(r *http.Request, gi *goidc.GrantInfo) error {
-		consentID, ok := consentID(gi.ActiveScopes)
+		consentID, ok := consent.ID(gi.ActiveScopes)
 		if !ok {
 			return nil
 		}
@@ -96,13 +96,4 @@ func TokenOptionsFunc() goidc.TokenOptionsFunc {
 	return func(gi goidc.GrantInfo, c *goidc.Client) goidc.TokenOptions {
 		return goidc.NewJWTTokenOptions(goidc.PS256, 300)
 	}
-}
-
-func consentID(scopes string) (string, bool) {
-	for _, s := range strings.Split(scopes, " ") {
-		if ScopeConsentID.Matches(s) {
-			return strings.Replace(s, "consent:", "", 1), true
-		}
-	}
-	return "", false
 }

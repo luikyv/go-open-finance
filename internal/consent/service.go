@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/luikyv/go-open-finance/internal/api"
 	"github.com/luikyv/go-open-finance/internal/mock"
@@ -22,6 +23,15 @@ var (
 	errCannotExtendConsentNotAuthorized       = errors.New("the consent is not in the AUTHORISED status")
 	errCannotExtendConsentForJointAccount     = errors.New("a consent created for a joint account cannot be extended")
 )
+
+func ID(scopes string) (string, bool) {
+	for _, s := range strings.Split(scopes, " ") {
+		if ScopeID.Matches(s) {
+			return strings.Replace(s, "consent:", "", 1), true
+		}
+	}
+	return "", false
+}
 
 type Service struct {
 	storage Storage

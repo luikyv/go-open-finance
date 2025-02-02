@@ -12,6 +12,6 @@ const (
 	MockBankCNPJ        string = "58540569000120"
 )
 
-func IsJointAccountPendingAuth(consentCreateAt timex.DateTime) bool {
-	return timex.Now().Before(consentCreateAt.Time.Add(3 * time.Minute))
+func IsJointAccountPendingAuth(consentAuthorizedAt timex.DateTime) bool {
+	return timex.Now().Before(consentAuthorizedAt.Time.Add(30 * time.Second))
 }

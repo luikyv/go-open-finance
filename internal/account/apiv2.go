@@ -1,11 +1,14 @@
 package account
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
+	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/go-open-finance/internal/api"
+	"github.com/luikyv/go-open-finance/internal/api/middleware"
+	"github.com/luikyv/go-open-finance/internal/consent"
 	"github.com/luikyv/go-open-finance/internal/mock"
 	"github.com/luikyv/go-open-finance/internal/page"
 	"github.com/luikyv/go-open-finance/internal/timex"
@@ -15,17 +18,67 @@ const (
 	dateTimeMillisFormat = "2006-01-02T15:04:05.000Z"
 )
 
-type APIHandlerV2 struct {
-	service Service
+type APIRouterV2 struct {
+	host           string
+	service        Service
+	consentService consent.Service
+	op             provider.Provider
 }
 
-func NewAPIHandlerV2(service Service) APIHandlerV2 {
-	return APIHandlerV2{
-		service: service,
+func NewAPIRouterV2(host string, service Service, consentService consent.Service, op provider.Provider) APIRouterV2 {
+	return APIRouterV2{
+		host:           host,
+		service:        service,
+		consentService: consentService,
+		op:             op,
 	}
 }
 
-func (router APIHandlerV2) GetAccountsHandler() http.Handler {
+func (router APIRouterV2) Register(mux *http.ServeMux) {
+	accountMux := http.NewServeMux()
+
+	handler := router.getAccountsHandler()
+	handler = consent.PermissionMiddlewareWithPagination(handler, router.consentService, consent.PermissionAccountsRead)
+	handler = middleware.AuthScopesWithPagination(handler, router.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.FAPIIDWithPagination(handler)
+	accountMux.Handle("GET /open-banking/accounts/v2/accounts", handler)
+
+	handler = router.getAccountHandler()
+	handler = consent.PermissionMiddlewareWithPagination(handler, router.consentService, consent.PermissionAccountsRead)
+	handler = middleware.AuthScopesWithPagination(handler, router.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.FAPIIDWithPagination(handler)
+	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}", handler)
+
+	handler = router.getAccountBalancesHandler()
+	handler = consent.PermissionMiddlewareWithPagination(handler, router.consentService, consent.PermissionAccountsBalanceRead)
+	handler = middleware.AuthScopesWithPagination(handler, router.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.FAPIIDWithPagination(handler)
+	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/balances", handler)
+
+	handler = router.getAccountTransactionsHandler(false)
+	handler = consent.PermissionMiddleware(handler, router.consentService, consent.PermissionAccountsTransactionsRead)
+	handler = middleware.AuthScopes(handler, router.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.FAPIID(handler)
+	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/transactions", handler)
+
+	handler = router.getAccountTransactionsHandler(true)
+	handler = consent.PermissionMiddleware(handler, router.consentService, consent.PermissionAccountsTransactionsRead)
+	handler = middleware.AuthScopes(handler, router.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.FAPIID(handler)
+	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/transactions-current", handler)
+
+	handler = router.getAccountOverdraftLimitsHandler()
+	handler = consent.PermissionMiddlewareWithPagination(handler, router.consentService, consent.PermissionAccountsOverdraftLimitsRead)
+	handler = middleware.AuthScopesWithPagination(handler, router.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.FAPIIDWithPagination(handler)
+	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/overdraft-limits", handler)
+
+	handler = accountMux
+	handler = middleware.Meta(handler, router.host)
+	mux.Handle("/open-banking/accounts/", handler)
+}
+
+func (router APIRouterV2) getAccountsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
@@ -42,17 +95,11 @@ func (router APIHandlerV2) GetAccountsHandler() http.Handler {
 		}
 
 		resp := toAccountsResponseV2(accs, reqURL)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err, true)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
 
-func (router APIHandlerV2) GetAccountHandler() http.Handler {
+func (router APIRouterV2) getAccountHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
@@ -65,17 +112,11 @@ func (router APIHandlerV2) GetAccountHandler() http.Handler {
 		}
 
 		resp := toAccountResponseV2(acc, reqURL)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err, true)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
 
-func (router APIHandlerV2) GetAccountBalancesHandler() http.Handler {
+func (router APIRouterV2) getAccountBalancesHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
@@ -88,59 +129,39 @@ func (router APIHandlerV2) GetAccountBalancesHandler() http.Handler {
 		}
 
 		resp := toBalancesResponseV2(acc, reqURL)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err, true)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
 
-func (router APIHandlerV2) GetAccountTransactionsHandler() http.Handler {
-	return router.getAccountTransactionsHandler(false, false)
-}
-
-func (router APIHandlerV2) GetAccountTransactionsCurrentHandler() http.Handler {
-	return router.getAccountTransactionsHandler(true, true)
-}
-
-func (router APIHandlerV2) getAccountTransactionsHandler(current bool, pagination bool) http.Handler {
+func (router APIRouterV2) getAccountTransactionsHandler(current bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
 		accID := r.PathValue("id")
 		pag, err := api.NewPagination(r)
 		if err != nil {
-			writeErrorV2(w, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, err.Error()), pagination)
+			writeErrorV2(w, api.NewError("INVALID_PARAMETER", http.StatusUnprocessableEntity, err.Error()), false)
 			return
 		}
 
 		filter, err := newTransactionFilter(r, current)
 		if err != nil {
-			writeErrorV2(w, err, pagination)
+			writeErrorV2(w, err, false)
 			return
 		}
 
 		trs, err := router.service.transactions(r.Context(), accID, consentID, pag, filter)
 		if err != nil {
-			writeErrorV2(w, err, pagination)
+			writeErrorV2(w, err, false)
 			return
 		}
 
 		resp := toAccountTransactionsResponseV2(trs, reqURL)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err, pagination)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
 
-func (router APIHandlerV2) GetAccountOverdraftLimitsHandler() http.Handler {
+func (router APIRouterV2) getAccountOverdraftLimitsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		consentID := r.Context().Value(api.CtxKeyConsentID).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
@@ -153,13 +174,7 @@ func (router APIHandlerV2) GetAccountOverdraftLimitsHandler() http.Handler {
 		}
 
 		resp := toOverdraftLimitsResponseV2(acc, reqURL)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			writeErrorV2(w, err, true)
-			return
-		}
+		api.WriteJSON(w, resp, http.StatusOK)
 	})
 }
 
@@ -304,6 +319,7 @@ func toAccountTransactionsResponseV2(trs page.Page[Transaction], reqURL string) 
 		Meta:  api.NewMeta(),
 		Links: api.NewPaginatedLinks(reqURL, trs),
 	}
+	resp.Links.Last = ""
 
 	for _, tr := range trs.Records {
 		resp.Data = append(resp.Data, transactionResponseV2{
@@ -433,7 +449,7 @@ func writeErrorV2(w http.ResponseWriter, err error, pagination bool) {
 	}
 
 	if errors.Is(err, errJointAccountPendingAuthorization) {
-		err := api.NewError("STATUS_RESOURCE_AWAITING_AUTHORIZATION", http.StatusForbidden, errAccountNotAllowed.Error())
+		err := api.NewError("STATUS_RESOURCE_PENDING_AUTHORISATION", http.StatusForbidden, errAccountNotAllowed.Error())
 		if pagination {
 			err = err.WithPagination()
 		}

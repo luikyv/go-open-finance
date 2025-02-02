@@ -62,7 +62,7 @@ build-cs:
 
 # Create a Conformance Suite configuration file using the client keys in /keys.
 cs-config:
-	@jq -n --arg alias "mockbank" \
+	@jq -n \
 	   --arg clientOneCert "$$(<keys/client_one.crt)" \
 	   --arg clientOneKey "$$(<keys/client_one.key)" \
 	   --arg clientTwoCert "$$(<keys/client_two.crt)" \

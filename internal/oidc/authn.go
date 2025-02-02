@@ -110,7 +110,7 @@ func (a authenticator) authenticate(w http.ResponseWriter, r *http.Request, sess
 }
 
 func (a authenticator) setUp(r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
-	consentID, ok := consentID(session.Scopes)
+	consentID, ok := consent.ID(session.Scopes)
 	if !ok {
 		return goidc.StatusFailure, errors.New("missing consent ID")
 	}

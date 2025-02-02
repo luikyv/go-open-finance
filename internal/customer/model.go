@@ -1,8 +1,11 @@
 package customer
 
 import (
+	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
+
+var Scope = goidc.NewScope("customers")
 
 type PersonalIdentification struct {
 	ID             string

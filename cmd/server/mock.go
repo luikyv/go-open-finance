@@ -2,14 +2,20 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
+	"math/rand"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/luikyv/go-open-finance/internal/account"
 	"github.com/luikyv/go-open-finance/internal/customer"
 	"github.com/luikyv/go-open-finance/internal/mock"
 	"github.com/luikyv/go-open-finance/internal/timex"
 	"github.com/luikyv/go-open-finance/internal/user"
+)
+
+var (
+	random = rand.New(rand.NewSource(42))
 )
 
 func loadMocks(
@@ -37,19 +43,17 @@ func loadUserBob(
 	accountService account.Service,
 ) error {
 
-	yearNow, monthNow, dayNow := timex.Now().Date()
-
 	var u = user.User{
 		UserName:  "bob@mail.com",
 		Email:     "bob@mail.com",
 		CPF:       "78628584099",
 		Name:      "Mr. Bob",
-		AccountID: "a0045152-0c5b-461b-9f98-135515c9f03a",
+		AccountID: uuid(),
 	}
 	userService.Create(ctx, u)
 
 	customerService.AddPersonalIdentification(ctx, u.CPF, customer.PersonalIdentification{
-		ID:            uuid.NewString(),
+		ID:            uuid(),
 		BrandName:     "MockBank",
 		CivilName:     "Bob",
 		SocialName:    "Bob",
@@ -105,7 +109,7 @@ func loadUserBob(
 		StartDateTime:  timex.NewDateTime(time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)),
 	})
 
-	accountService.Set(u.CPF, account.Account{
+	acc := account.Account{
 		ID:      u.AccountID,
 		Number:  "53748219",
 		Type:    account.TypeCheckingAccount,
@@ -115,27 +119,33 @@ func loadUserBob(
 			BlockedAmount:               "0.00",
 			AutomaticallyInvestedAmount: "0.00",
 		},
-		Transactions: []account.Transaction{
-			{
-				ID:           "e592540e-9cad-44c1-9ca5-4a75614729cc",
-				Status:       account.TransactionStatusCompleted,
-				MovementType: account.MovementTypeCredit,
-				Name:         "First Transaction",
-				Type:         account.TransactionTypePix,
-				Amount:       "100.00",
-				DateTime:     timex.NewDateTime(time.Date(yearNow, monthNow, dayNow-2, 12, 0, 0, 0, time.UTC)),
-			},
-			{
-				ID:           "097f4588-b075-439b-8f45-f2294e78f65f",
-				Status:       account.TransactionStatusCompleted,
-				MovementType: account.MovementTypeDebit,
-				Name:         "Second Transaction",
-				Type:         account.TransactionTypePix,
-				Amount:       "100.00",
-				DateTime:     timex.NewDateTime(time.Date(yearNow, monthNow, dayNow-1, 12, 0, 0, 0, time.UTC)),
-			},
-		},
-	})
+	}
+
+	for i := 0; i < 30; i++ {
+		acc.Transactions = append(acc.Transactions, account.Transaction{
+			ID:           uuid(),
+			Status:       account.TransactionStatusCompleted,
+			MovementType: account.MovementTypeCredit,
+			Name:         fmt.Sprintf("Transaction %d", 30-i),
+			Type:         account.TransactionTypePix,
+			Amount:       "100.00",
+			DateTime:     timex.NewDateTime(timex.DateTimeNow().Add(-time.Duration(i) * time.Hour)),
+		})
+	}
+
+	for i := 0; i < 12; i++ {
+		acc.Transactions = append(acc.Transactions, account.Transaction{
+			ID:           uuid(),
+			Status:       account.TransactionStatusCompleted,
+			MovementType: account.MovementTypeCredit,
+			Name:         fmt.Sprintf("Monthly Transaction %d", 12-i),
+			Type:         account.TransactionTypePix,
+			Amount:       "100.00",
+			DateTime:     timex.NewDateTime(timex.DateTimeNow().AddDate(0, -i, 0)),
+		})
+	}
+
+	accountService.Set(u.CPF, acc)
 
 	return nil
 }
@@ -151,7 +161,7 @@ func loadUserAlice(
 		Email:     "alice@mail.com",
 		CPF:       mock.CPFWithJointAccount,
 		Name:      "Ms. Alice",
-		AccountID: "26c19825-e74a-4235-af2e-58c7d9dc44ca",
+		AccountID: uuid(),
 	}
 	userService.Create(ctx, u)
 
@@ -167,7 +177,7 @@ func loadUserAlice(
 		},
 		Transactions: []account.Transaction{
 			{
-				ID:           "9fc3b132-033c-4a33-898d-1e2366425d4b",
+				ID:           uuid(),
 				Status:       account.TransactionStatusCompleted,
 				MovementType: account.MovementTypeCredit,
 				Name:         "First Transaction",
@@ -179,4 +189,15 @@ func loadUserAlice(
 	})
 
 	return nil
+}
+
+// uuid generates a UUID-like string using a seeded random generator.
+func uuid() string {
+	b := make([]byte, 16)
+	random.Read(b)
+	return hex.EncodeToString(b[:4]) + "-" +
+		hex.EncodeToString(b[4:6]) + "-" +
+		hex.EncodeToString(b[6:8]) + "-" +
+		hex.EncodeToString(b[8:10]) + "-" +
+		hex.EncodeToString(b[10:])
 }

@@ -3,12 +3,10 @@ package account
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/luikyv/go-open-finance/internal/consent"
 	"github.com/luikyv/go-open-finance/internal/mock"
 	"github.com/luikyv/go-open-finance/internal/page"
-	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
 var (
@@ -39,7 +37,7 @@ func (s Service) accounts(ctx context.Context, consentID string, pag page.Pagina
 		return page.Page[Account]{}, err
 	}
 
-	if c.UserCPF == mock.CPFWithJointAccount && c.CreationDateTime.Time.Before(timex.Now().Add(3*time.Minute)) {
+	if c.UserCPF == mock.CPFWithJointAccount && mock.IsJointAccountPendingAuth(c.StatusUpdateDateTime) {
 		return page.Paginate([]Account{}, pag), nil
 	}
 
@@ -56,7 +54,7 @@ func (s Service) account(ctx context.Context, accID, consentID string) (Account,
 		return Account{}, errAccountNotAllowed
 	}
 
-	if c.UserCPF == mock.CPFWithJointAccount && mock.IsJointAccountPendingAuth(c.CreationDateTime) {
+	if c.UserCPF == mock.CPFWithJointAccount && mock.IsJointAccountPendingAuth(c.StatusUpdateDateTime) {
 		return Account{}, errJointAccountPendingAuthorization
 	}
 

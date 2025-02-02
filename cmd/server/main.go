@@ -8,13 +8,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-open-finance/internal/account"
 	"github.com/luikyv/go-open-finance/internal/api"
-	"github.com/luikyv/go-open-finance/internal/api/middleware"
 	"github.com/luikyv/go-open-finance/internal/consent"
 	"github.com/luikyv/go-open-finance/internal/customer"
-	"github.com/luikyv/go-open-finance/internal/oidc"
 	"github.com/luikyv/go-open-finance/internal/resource"
 	"github.com/luikyv/go-open-finance/internal/user"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -54,59 +51,26 @@ func main() {
 	customerService := customer.NewService(customerStorage)
 	accountService := account.NewService(accountStorage, consentService)
 
-	// API Handlers.
-	customerAPIHandlerV2 := customer.NewAPIHandlerV2(customerService)
-	consentAPIHandlerV3 := consent.NewAPIHandlerV3(mtlsHost, consentService)
-	resourceAPIHandlerV3 := resource.NewAPIHandlerV3(resourceService)
-	accountAPIHandlerV2 := account.NewAPIHandlerV2(accountService)
-
-	// Server.
-	mux := http.NewServeMux()
-
+	// OpenID Provider.
 	op, err := openidProvider(db, userService, consentService)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// API Routers.
+	consentAPIRouterV3 := consent.NewAPIRouterV3(mtlsHost, consentService, op)
+	resourceAPIRouterV3 := resource.NewAPIRouterV3(mtlsHost, resourceService, consentService, op)
+	customerAPIRouterV2 := customer.NewAPIRouterV2(mtlsHost, customerService, consentService, op)
+	accountAPIRouterV2 := account.NewAPIRouterV2(mtlsHost, accountService, consentService, op)
+
+	// Server.
+	mux := http.NewServeMux()
+
 	mux.Handle(pathPrefixOIDC+"/", op.Handler())
-
-	opfMux := http.NewServeMux()
-
-	consentMux := http.NewServeMux()
-	consentMux.Handle("POST /open-banking/consents/v3/consents", middleware.AuthScopes(consentAPIHandlerV3.CreateHandler(), op, oidc.ScopeConsents))
-	consentMux.Handle("GET /open-banking/consents/v3/consents/{id}", middleware.AuthScopes(consentAPIHandlerV3.GetHandler(), op, oidc.ScopeConsents))
-	consentMux.Handle("DELETE /open-banking/consents/v3/consents/{id}", middleware.AuthScopes(consentAPIHandlerV3.DeleteHandler(), op, oidc.ScopeConsents))
-	consentMux.Handle("POST /open-banking/consents/v3/consents/{id}/extends", middleware.AuthScopes(consentAPIHandlerV3.ExtendHandler(), op, goidc.ScopeOpenID, oidc.ScopeConsentID))
-	consentMux.Handle("GET /open-banking/consents/v3/consents/{id}/extensions", middleware.AuthScopes(consentAPIHandlerV3.GetExtensionsHandler(), op, oidc.ScopeConsents))
-	opfMux.Handle("/open-banking/consents/", consentMux)
-
-	customerMux := http.NewServeMux()
-	customerMux.Handle("GET /open-banking/customers/v2/personal/identifications",
-		middleware.AuthPermissions(customerAPIHandlerV2.GetPersonalIdentificationsHandler(), consentService, consent.PermissionCustomersPersonalIdentificationsRead))
-	customerMux.Handle("GET /open-banking/customers/v2/personal/qualifications",
-		middleware.AuthPermissions(customerAPIHandlerV2.GetPersonalQualificationsHandler(), consentService, consent.PermissionCustomersPersonalAdittionalInfoRead))
-	customerMux.Handle("GET /open-banking/customers/v2/personal/financial-relations",
-		middleware.AuthPermissions(customerAPIHandlerV2.GetPersonalFinancialRelationsHandler(), consentService, consent.PermissionCustomersPersonalAdittionalInfoRead))
-	opfMux.Handle("/open-banking/customers/", middleware.AuthScopes(customerMux, op, goidc.ScopeOpenID, oidc.ScopeConsentID))
-
-	opfMux.Handle("GET /open-banking/resources/v3/resources",
-		middleware.AuthScopes(middleware.AuthPermissions(resourceAPIHandlerV3.GetHandler(), consentService, consent.PermissionResourcesRead), op, oidc.ScopeConsentID))
-
-	accountMux := http.NewServeMux()
-	accountMux.Handle("GET /open-banking/accounts/v2/accounts",
-		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountsHandler(), consentService, consent.PermissionAccountsRead))
-	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}",
-		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountHandler(), consentService, consent.PermissionAccountsRead))
-	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/balances",
-		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountBalancesHandler(), consentService, consent.PermissionAccountsBalanceRead))
-	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/transactions",
-		middleware.AuthPermissions(accountAPIHandlerV2.GetAccountTransactionsHandler(), consentService, consent.PermissionAccountsTransactionsRead))
-	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/transactions-current",
-		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountTransactionsCurrentHandler(), consentService, consent.PermissionAccountsTransactionsRead))
-	accountMux.Handle("GET /open-banking/accounts/v2/accounts/{id}/overdraft-limits",
-		middleware.AuthPermissionsWithPagination(accountAPIHandlerV2.GetAccountOverdraftLimitsHandler(), consentService, consent.PermissionAccountsOverdraftLimitsRead))
-	opfMux.Handle("/open-banking/accounts/", middleware.AuthScopesWithPagination(accountMux, op, goidc.ScopeOpenID, oidc.ScopeConsentID))
-
-	mux.Handle("/open-banking/", middleware.Meta(middleware.FAPIID(opfMux), mtlsHost))
+	consentAPIRouterV3.Register(mux)
+	resourceAPIRouterV3.Register(mux)
+	customerAPIRouterV2.Register(mux)
+	accountAPIRouterV2.Register(mux)
 
 	// Run.
 	_ = loadMocks(userService, customerService, accountService)
@@ -118,11 +82,14 @@ func main() {
 func dbConnection() (*mongo.Database, error) {
 	ctx := context.Background()
 
-	conn, err := mongo.Connect(ctx, options.Client().ApplyURI(dbStringCon).SetBSONOptions(&options.BSONOptions{
+	opts := options.Client()
+	opts = opts.ApplyURI(dbStringCon)
+	opts = opts.SetBSONOptions(&options.BSONOptions{
 		UseJSONStructTags: true,
 		NilMapAsEmpty:     true,
 		NilSliceAsEmpty:   true,
-	}))
+	})
+	conn, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
 	}

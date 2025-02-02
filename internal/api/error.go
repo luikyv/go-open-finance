@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -40,9 +39,6 @@ func WriteError(w http.ResponseWriter, err error) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(apiErr.statusCode)
-
 	errResp := response{
 		Errors: []struct {
 			Code   string `json:"code"`
@@ -60,7 +56,8 @@ func WriteError(w http.ResponseWriter, err error) {
 	if apiErr.pagination {
 		errResp.Meta = NewSingleRecordMeta()
 	}
-	_ = json.NewEncoder(w).Encode(errResp)
+
+	WriteJSON(w, errResp, apiErr.statusCode)
 }
 
 type response struct {

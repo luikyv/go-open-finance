@@ -1,6 +1,7 @@
 package account
 
 import (
+	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
@@ -9,6 +10,10 @@ const (
 	DefaultBranch     string = "0001"
 	DefaultCheckDigit string = "1"
 	DefaultCurrency   string = "BRL"
+)
+
+var (
+	Scope = goidc.NewScope("accounts")
 )
 
 type Account struct {

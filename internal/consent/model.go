@@ -3,8 +3,10 @@ package consent
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/luikyv/go-oidc/pkg/goidc"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
@@ -14,6 +16,13 @@ const (
 	headerCustomerUserAgent          = "X-Customer-User-Agent"
 	defaultUserDocumentRelation      = "CPF"
 	defaultBusinessDocumentRelation  = "CNPJ"
+)
+
+var (
+	ScopeID = goidc.NewDynamicScope("consent", func(requestedScope string) bool {
+		return strings.HasPrefix(requestedScope, "consent:")
+	})
+	Scope = goidc.NewScope("consents")
 )
 
 type Consent struct {

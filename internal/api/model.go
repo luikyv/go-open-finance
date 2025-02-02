@@ -15,14 +15,19 @@ type ContextKey string
 const (
 	CtxKeyClientID      ContextKey = "client_id"
 	CtxKeySubject       ContextKey = "subject"
+	CtxKeyScopes        ContextKey = "scopes"
 	CtxKeyConsentID     ContextKey = "consent_id"
 	CtxKeyInteractionID ContextKey = "interaction_id"
 	CtxKeyRequestURL    ContextKey = "request_url"
 )
 
+const (
+	maxPageSize int = 25
+)
+
 func NewPagination(r *http.Request) (page.Pagination, error) {
-	pageNumber := 0
-	pageSize := 0
+	pageNumber := 1
+	pageSize := maxPageSize
 
 	// Get "page" query parameter and convert it to an integer.
 	pageStr := r.URL.Query().Get("page")
@@ -42,6 +47,10 @@ func NewPagination(r *http.Request) (page.Pagination, error) {
 
 	if pageSize > 1000 {
 		return page.Pagination{}, errors.New("invalid page size")
+	}
+
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
 	}
 
 	return page.NewPagination(pageNumber, pageSize), nil
@@ -98,8 +107,8 @@ func NewPaginatedLinks[T any](requestedURL string, page page.Page[T]) Links {
 
 type Meta struct {
 	RequestDateTime timex.DateTime `json:"requestDateTime"`
-	TotalRecords    int            `json:"totalRecords,omitempty"`
-	TotalPages      int            `json:"totalPages,omitempty"`
+	TotalRecords    *int           `json:"totalRecords,omitempty"`
+	TotalPages      *int           `json:"totalPages,omitempty"`
 }
 
 func NewMeta() Meta {
@@ -111,15 +120,16 @@ func NewMeta() Meta {
 func NewPaginatedMeta[T any](p page.Page[T]) Meta {
 	return Meta{
 		RequestDateTime: timex.DateTimeNow(),
-		TotalRecords:    p.TotalRecords,
-		TotalPages:      p.TotalPages,
+		TotalRecords:    &p.TotalRecords,
+		TotalPages:      &p.TotalPages,
 	}
 }
 
 func NewSingleRecordMeta() Meta {
+	one := 1
 	return Meta{
 		RequestDateTime: timex.DateTimeNow(),
-		TotalRecords:    1,
-		TotalPages:      1,
+		TotalRecords:    &one,
+		TotalPages:      &one,
 	}
 }

@@ -1,5 +1,11 @@
 package resource
 
+import "github.com/luikyv/go-oidc/pkg/goidc"
+
+var (
+	Scope = goidc.NewScope("resources")
+)
+
 type Resource struct {
 	ID     string
 	Type   Type

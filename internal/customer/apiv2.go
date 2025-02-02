@@ -4,22 +4,54 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/luikyv/go-oidc/pkg/goidc"
+	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/go-open-finance/internal/api"
+	"github.com/luikyv/go-open-finance/internal/api/middleware"
+	"github.com/luikyv/go-open-finance/internal/consent"
 	"github.com/luikyv/go-open-finance/internal/page"
 	"github.com/luikyv/go-open-finance/internal/timex"
 )
 
-type APIHandlerV2 struct {
-	service Service
+type APIRouterV2 struct {
+	host           string
+	service        Service
+	consentService consent.Service
+	op             provider.Provider
 }
 
-func NewAPIHandlerV2(service Service) APIHandlerV2 {
-	return APIHandlerV2{
-		service: service,
+func NewAPIRouterV2(host string, service Service, consentService consent.Service, op provider.Provider) APIRouterV2 {
+	return APIRouterV2{
+		host:           host,
+		service:        service,
+		consentService: consentService,
+		op:             op,
 	}
 }
 
-func (router APIHandlerV2) GetPersonalIdentificationsHandler() http.Handler {
+func (router APIRouterV2) Register(mux *http.ServeMux) {
+	customerMux := http.NewServeMux()
+
+	handler := router.getPersonalIdentificationsHandler()
+	handler = consent.PermissionMiddleware(handler, router.consentService, consent.PermissionCustomersPersonalIdentificationsRead)
+	customerMux.Handle("GET /open-banking/customers/v2/personal/identifications", handler)
+
+	handler = router.getPersonalQualificationsHandler()
+	handler = consent.PermissionMiddleware(handler, router.consentService, consent.PermissionCustomersPersonalAdittionalInfoRead)
+	customerMux.Handle("GET /open-banking/customers/v2/personal/qualifications", handler)
+
+	handler = router.getPersonalFinancialRelationsHandler()
+	handler = consent.PermissionMiddleware(handler, router.consentService, consent.PermissionCustomersPersonalAdittionalInfoRead)
+	customerMux.Handle("GET /open-banking/customers/v2/personal/financial-relations", handler)
+
+	handler = customerMux
+	handler = middleware.AuthScopes(handler, router.op, goidc.ScopeOpenID, consent.ScopeID)
+	handler = middleware.FAPIID(handler)
+	handler = middleware.Meta(handler, router.host)
+	mux.Handle("/open-banking/customers/", handler)
+}
+
+func (router APIRouterV2) getPersonalIdentificationsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sub := r.Context().Value(api.CtxKeySubject).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
@@ -41,7 +73,7 @@ func (router APIHandlerV2) GetPersonalIdentificationsHandler() http.Handler {
 	})
 }
 
-func (router APIHandlerV2) GetPersonalQualificationsHandler() http.Handler {
+func (router APIRouterV2) getPersonalQualificationsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sub := r.Context().Value(api.CtxKeySubject).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
@@ -58,7 +90,7 @@ func (router APIHandlerV2) GetPersonalQualificationsHandler() http.Handler {
 	})
 }
 
-func (router APIHandlerV2) GetPersonalFinancialRelationsHandler() http.Handler {
+func (router APIRouterV2) getPersonalFinancialRelationsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sub := r.Context().Value(api.CtxKeySubject).(string)
 		reqURL := r.Context().Value(api.CtxKeyRequestURL).(string)
