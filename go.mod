@@ -4,7 +4,7 @@ go 1.22.4
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/luikyv/go-oidc v0.6.1
+	github.com/luikyv/go-oidc v0.8.0
 	go.mongodb.org/mongo-driver v1.17.2
 )
 

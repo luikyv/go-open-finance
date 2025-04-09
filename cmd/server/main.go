@@ -11,6 +11,7 @@ import (
 	"github.com/luikyv/go-open-finance/internal/account"
 	"github.com/luikyv/go-open-finance/internal/api"
 	"github.com/luikyv/go-open-finance/internal/consent"
+	"github.com/luikyv/go-open-finance/internal/creditcard"
 	"github.com/luikyv/go-open-finance/internal/customer"
 	"github.com/luikyv/go-open-finance/internal/resource"
 	"github.com/luikyv/go-open-finance/internal/user"
@@ -43,6 +44,7 @@ func main() {
 	consentStorage := consent.NewStorage(db)
 	customerStorage := customer.NewStorage()
 	accountStorage := account.NewStorage()
+	creditCardStorage := creditcard.NewStorage()
 
 	// Services.
 	userService := user.NewService(userStorage)
@@ -50,6 +52,7 @@ func main() {
 	resourceService := resource.NewService(consentService)
 	customerService := customer.NewService(customerStorage)
 	accountService := account.NewService(accountStorage, consentService)
+	creditCardService := creditcard.NewService(creditCardStorage, consentService)
 
 	// OpenID Provider.
 	op, err := openidProvider(db, userService, consentService)
@@ -62,6 +65,7 @@ func main() {
 	resourceAPIRouterV3 := resource.NewAPIRouterV3(mtlsHost, resourceService, consentService, op)
 	customerAPIRouterV2 := customer.NewAPIRouterV2(mtlsHost, customerService, consentService, op)
 	accountAPIRouterV2 := account.NewAPIRouterV2(mtlsHost, accountService, consentService, op)
+	creditCardAPIRouterV2 := creditcard.NewAPIRouterV2(mtlsHost, creditCardService, consentService, op)
 
 	// Server.
 	mux := http.NewServeMux()
@@ -71,9 +75,10 @@ func main() {
 	resourceAPIRouterV3.Register(mux)
 	customerAPIRouterV2.Register(mux)
 	accountAPIRouterV2.Register(mux)
+	creditCardAPIRouterV2.Register(mux)
 
 	// Run.
-	_ = loadMocks(userService, customerService, accountService)
+	_ = loadMocks(userService, customerService, accountService, creditCardService)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)
 	}

@@ -21,10 +21,7 @@ func NewGrantSessionManager(database *mongo.Database) GrantSessionManager {
 	}
 }
 
-func (manager GrantSessionManager) Save(
-	ctx context.Context,
-	grantSession *goidc.GrantSession,
-) error {
+func (manager GrantSessionManager) Save(ctx context.Context, grantSession *goidc.GrantSession) error {
 	shouldReplace := true
 	filter := bson.D{{Key: "_id", Value: grantSession.ID}}
 	if _, err := manager.coll.ReplaceOne(
@@ -39,33 +36,18 @@ func (manager GrantSessionManager) Save(
 	return nil
 }
 
-func (manager GrantSessionManager) SessionByTokenID(
-	ctx context.Context,
-	id string,
-) (
-	*goidc.GrantSession,
-	error,
-) {
+func (manager GrantSessionManager) SessionByTokenID(ctx context.Context, id string) (*goidc.GrantSession, error) {
 	return manager.getWithFilter(ctx, bson.D{{Key: "token_id", Value: id}})
 }
 
-func (manager GrantSessionManager) SessionByRefreshToken(
-	ctx context.Context,
-	token string,
-) (
-	*goidc.GrantSession,
-	error,
-) {
+func (manager GrantSessionManager) SessionByRefreshTokenID(ctx context.Context, token string) (*goidc.GrantSession, error) {
 	return manager.getWithFilter(
 		ctx,
 		bson.D{{Key: "refresh_token", Value: token}},
 	)
 }
 
-func (manager GrantSessionManager) Delete(
-	ctx context.Context,
-	id string,
-) error {
+func (manager GrantSessionManager) Delete(ctx context.Context, id string) error {
 	filter := bson.D{{Key: "_id", Value: id}}
 	if _, err := manager.coll.DeleteOne(ctx, filter); err != nil {
 		return err
@@ -74,17 +56,11 @@ func (manager GrantSessionManager) Delete(
 	return nil
 }
 
-func (m GrantSessionManager) DeleteByAuthorizationCode(context.Context, string) error {
+func (m GrantSessionManager) DeleteByAuthCode(context.Context, string) error {
 	return nil
 }
 
-func (manager GrantSessionManager) getWithFilter(
-	ctx context.Context,
-	filter any,
-) (
-	*goidc.GrantSession,
-	error,
-) {
+func (manager GrantSessionManager) getWithFilter(ctx context.Context, filter any) (*goidc.GrantSession, error) {
 
 	result := manager.coll.FindOne(ctx, filter)
 	if result.Err() != nil {

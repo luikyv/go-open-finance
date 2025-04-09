@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/luikyv/go-open-finance/internal/account"
+	"github.com/luikyv/go-open-finance/internal/creditcard"
 	"github.com/luikyv/go-open-finance/internal/customer"
 	"github.com/luikyv/go-open-finance/internal/mock"
 	"github.com/luikyv/go-open-finance/internal/timex"
@@ -22,10 +23,11 @@ func loadMocks(
 	userService user.Service,
 	customerService customer.Service,
 	accountService account.Service,
+	creditCardService creditcard.Service,
 ) error {
 	ctx := context.Background()
 
-	if err := loadUserBob(ctx, userService, customerService, accountService); err != nil {
+	if err := loadUserBob(ctx, userService, customerService, accountService, creditCardService); err != nil {
 		return err
 	}
 
@@ -41,16 +43,15 @@ func loadUserBob(
 	userService user.Service,
 	customerService customer.Service,
 	accountService account.Service,
+	creditCardService creditcard.Service,
 ) error {
 
 	var u = user.User{
-		UserName:  "bob@mail.com",
-		Email:     "bob@mail.com",
-		CPF:       "78628584099",
-		Name:      "Mr. Bob",
-		AccountID: uuid(),
+		UserName: "bob@mail.com",
+		Email:    "bob@mail.com",
+		CPF:      "78628584099",
+		Name:     "Mr. Bob",
 	}
-	userService.Create(ctx, u)
 
 	customerService.AddPersonalIdentification(ctx, u.CPF, customer.PersonalIdentification{
 		ID:            uuid(),
@@ -109,8 +110,11 @@ func loadUserBob(
 		StartDateTime:  timex.NewDateTime(time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)),
 	})
 
+	// ========================= Accounts =========================
+	accountID := uuid()
+	u.AccountID = accountID
 	acc := account.Account{
-		ID:      u.AccountID,
+		ID:      accountID,
 		Number:  "53748219",
 		Type:    account.TypeCheckingAccount,
 		SubType: account.SubTypeIndividual,
@@ -147,6 +151,21 @@ func loadUserBob(
 
 	accountService.Set(u.CPF, acc)
 
+	// ========================= Credit Cards =========================
+	creditCardID := uuid()
+	u.CreditAccountID = creditCardID
+	card := creditcard.Account{
+		ID:      creditCardID,
+		Name:    "Black card",
+		Type:    creditcard.TypeBlack,
+		Network: creditcard.NetworkVisa,
+		MainCard: creditcard.Card{
+			Number: "4539148803436467",
+		},
+	}
+	creditCardService.Add(u.CPF, card)
+
+	userService.Create(ctx, u)
 	return nil
 }
 

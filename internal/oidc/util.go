@@ -86,7 +86,7 @@ func DCRFunc(scopes []goidc.Scope) goidc.HandleDynamicClientFunc {
 		scopeIDs = append(scopeIDs, scope.ID)
 	}
 	scopeIDsStr := strings.Join(scopeIDs, " ")
-	return func(r *http.Request, c *goidc.ClientMetaInfo) error {
+	return func(r *http.Request, _ string, c *goidc.ClientMeta) error {
 		c.ScopeIDs = scopeIDsStr
 		return nil
 	}

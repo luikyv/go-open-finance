@@ -16,6 +16,7 @@ import (
 	"github.com/luikyv/go-oidc/pkg/provider"
 	"github.com/luikyv/go-open-finance/internal/account"
 	"github.com/luikyv/go-open-finance/internal/consent"
+	"github.com/luikyv/go-open-finance/internal/creditcard"
 	"github.com/luikyv/go-open-finance/internal/customer"
 	"github.com/luikyv/go-open-finance/internal/oidc"
 	"github.com/luikyv/go-open-finance/internal/resource"
@@ -29,7 +30,7 @@ var Scopes = []goidc.Scope{
 	consent.Scope,
 	customer.Scope,
 	account.Scope,
-	// ScopeCreditCardAccounts,
+	creditcard.Scope,
 	// ScopeLoans,
 	// ScopeFinancings,
 	// ScopeUnarrangedAccountsOverdraft,
@@ -45,8 +46,6 @@ var Scopes = []goidc.Scope{
 
 // var (
 // 	ScopeOpenID                      = goidc.ScopeOpenID
-// 	ScopeAccounts                    = goidc.NewScope("accounts")
-// 	ScopeCreditCardAccounts          = goidc.NewScope("credit-cards-accounts")
 // 	ScopeLoans                       = goidc.NewScope("loans")
 // 	ScopeFinancings                  = goidc.NewScope("financings")
 // 	ScopeUnarrangedAccountsOverdraft = goidc.NewScope("unarranged-accounts-overdraft")
@@ -64,7 +63,7 @@ func openidProvider(
 	userService user.Service,
 	consentService consent.Service,
 ) (
-	provider.Provider,
+	*provider.Provider,
 	error,
 ) {
 
@@ -128,14 +127,9 @@ func client(clientID string, keysDir string) *goidc.Client {
 	}
 
 	privateJWKS := privateJWKS(filepath.Join(keysDir, clientID+".jwks"))
-	publicJWKS := goidc.JSONWebKeySet{Keys: []goidc.JSONWebKey{}}
-	for _, jwk := range privateJWKS.Keys {
-		publicJWKS.Keys = append(publicJWKS.Keys, jwk.Public())
-	}
-	rawPublicJWKS, _ := json.Marshal(publicJWKS)
 	return &goidc.Client{
 		ID: clientID,
-		ClientMetaInfo: goidc.ClientMetaInfo{
+		ClientMeta: goidc.ClientMeta{
 			TokenAuthnMethod: goidc.ClientAuthnPrivateKeyJWT,
 			ScopeIDs:         strings.Join(scopes, " "),
 			RedirectURIs: []string{
@@ -151,7 +145,7 @@ func client(clientID string, keysDir string) *goidc.Client {
 				goidc.ResponseTypeCode,
 				goidc.ResponseTypeCodeAndIDToken,
 			},
-			PublicJWKS:           rawPublicJWKS,
+			PublicJWKS:           privateJWKS.Public(),
 			IDTokenKeyEncAlg:     goidc.RSA_OAEP,
 			IDTokenContentEncAlg: goidc.A128CBC_HS256,
 		},

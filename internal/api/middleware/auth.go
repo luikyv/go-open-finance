@@ -11,15 +11,15 @@ import (
 	"github.com/luikyv/go-open-finance/internal/api"
 )
 
-func AuthScopes(next http.Handler, op provider.Provider, scopes ...goidc.Scope) http.Handler {
+func AuthScopes(next http.Handler, op *provider.Provider, scopes ...goidc.Scope) http.Handler {
 	return authScopes(next, op, false, scopes...)
 }
 
-func AuthScopesWithPagination(next http.Handler, op provider.Provider, scopes ...goidc.Scope) http.Handler {
+func AuthScopesWithPagination(next http.Handler, op *provider.Provider, scopes ...goidc.Scope) http.Handler {
 	return authScopes(next, op, true, scopes...)
 }
 
-func authScopes(next http.Handler, op provider.Provider, pagination bool, scopes ...goidc.Scope) http.Handler {
+func authScopes(next http.Handler, op *provider.Provider, pagination bool, scopes ...goidc.Scope) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenInfo, err := op.TokenInfoFromRequest(w, r)
 		if err != nil {

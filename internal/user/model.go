@@ -5,12 +5,13 @@ import (
 )
 
 type User struct {
-	UserName     string
-	Email        string
-	CPF          string
-	Name         string
-	AccountID    string
-	CompanyCNPJs []string
+	UserName        string
+	Email           string
+	CPF             string
+	Name            string
+	AccountID       string
+	CreditAccountID string
+	CompanyCNPJs    []string
 }
 
 func (u User) OwnsCompany(cnpj string) bool {

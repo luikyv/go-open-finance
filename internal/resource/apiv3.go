@@ -15,10 +15,10 @@ type APIRouterV3 struct {
 	host           string
 	service        Service
 	consentService consent.Service
-	op             provider.Provider
+	op             *provider.Provider
 }
 
-func NewAPIRouterV3(host string, service Service, consentService consent.Service, op provider.Provider) APIRouterV3 {
+func NewAPIRouterV3(host string, service Service, consentService consent.Service, op *provider.Provider) APIRouterV3 {
 	return APIRouterV3{
 		host:           host,
 		service:        service,

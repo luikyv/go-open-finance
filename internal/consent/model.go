@@ -40,7 +40,8 @@ type Consent struct {
 	ExpirationDateTime   *timex.DateTime `bson:"expires_at,omitempty"`
 
 	// Resources consented by the user.
-	AccountID string `json:"account_id,omitempty"`
+	AccountID       string `json:"account_id,omitempty"`
+	CreditAccountID string `json:"credit_account_id,omitempty"`
 }
 
 // HasAuthExpired returns true if the status is [StatusAwaitingAuthorisation] and

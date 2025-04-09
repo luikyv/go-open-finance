@@ -192,7 +192,14 @@ func (a authenticator) login(w http.ResponseWriter, r *http.Request, session *go
 	return goidc.StatusSuccess, nil
 }
 
-func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, session *goidc.AuthnSession) (goidc.AuthnStatus, error) {
+func (a authenticator) grantConsent(
+	w http.ResponseWriter,
+	r *http.Request,
+	session *goidc.AuthnSession,
+) (
+	goidc.AuthnStatus,
+	error,
+) {
 
 	_ = r.ParseForm()
 
@@ -237,6 +244,11 @@ func (a authenticator) grantConsent(w http.ResponseWriter, r *http.Request, sess
 		return strings.HasPrefix(string(p), "ACCOUNTS_")
 	}) {
 		c.AccountID = u.AccountID
+	}
+	if slices.ContainsFunc(c.Permissions, func(p consent.Permission) bool {
+		return strings.HasPrefix(string(p), "CREDIT_CARDS_")
+	}) {
+		c.CreditAccountID = u.CreditAccountID
 	}
 
 	if err := a.consentService.Authorize(r.Context(), c); err != nil {

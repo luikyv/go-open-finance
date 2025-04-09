@@ -75,6 +75,34 @@
                                 "ApiEndpoint": "https://matls-mockbank.local/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits"
                             }
                         ]
+                    },
+                    {
+                        "ApiVersion": "2.3.1",
+                        "ApiFamilyType": "credit-cards-accounts",
+                        "Status": "Active",
+                        "ApiDiscoveryEndpoints": [
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/credit-cards-accounts/v2/accounts"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/bills/{billId}/transactions"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/limits"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions"
+                            },
+                            {
+                                "ApiEndpoint": "https://matls-mockbank.local/open-banking/credit-cards-accounts/v2/accounts/{creditCardAccountId}/transactions-current"
+                            }
+                        ]
                     }
                 ]
             }
